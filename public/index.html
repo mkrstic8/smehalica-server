@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Смехалица укрштеница — Online</title>
+    <style>
+        :root {
+            --cell-size: 34px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a3a1a 0%, #2d6a2d 30%, #1a4a1a 60%, #0d2b0d 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 8px;
+            color: white;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        h1 { font-size: 1.5rem; margin: 6px 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); text-align: center; color: #FFD700; letter-spacing: 1px; }
+        .subtitle { font-size: 0.75rem; margin-bottom: 6px; opacity: 0.8; text-align: center; }
+        .game-container { background: rgba(255,255,255,0.08); border-radius: 14px; padding: 10px; backdrop-filter: blur(10px); box-shadow: 0 8px 32px rgba(0,0,0,0.4); display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 100%; }
+        .board-wrapper { overflow: auto; max-width: 95vw; max-height: 55vh; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); -webkit-overflow-scrolling: touch; }
+        .board { display: grid; grid-template-columns: repeat(15, var(--cell-size)); grid-template-rows: repeat(15, var(--cell-size)); gap: 1px; background: #1a0f05; padding: 2px; border-radius: 4px; }
+        .cell { width: var(--cell-size); height: var(--cell-size); background: #f0e0c8; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.95rem; cursor: pointer; transition: all 0.15s; position: relative; border-radius: 2px; min-width: var(--cell-size); min-height: var(--cell-size); }
+        .cell:active { transform: scale(0.9); }
+        .cell.occupied { background: #ffe4b5; cursor: default; box-shadow: inset 0 0 4px rgba(0,0,0,0.2); }
+        .cell.newly-placed { background: #ffd700 !important; animation: pulse 0.4s ease-in-out 3; }
+        .cell.last-move { background: #ffab40 !important; }
+        @keyframes pulse { 0%,100%{box-shadow:0 0 3px rgba(255,200,0,0.4)} 50%{box-shadow:0 0 15px rgba(255,200,0,0.9)} }
+        .cell.tw{background:#e57373}.cell.dw{background:#ffb74d}.cell.tl{background:#64b5f6}.cell.dl{background:#81c784}.cell.star{background:#ff8a80}
+        .cell.occupied.tw,.cell.occupied.dw,.cell.occupied.tl,.cell.occupied.dl,.cell.occupied.star{background:#ffe4b5}
+        .cell.tw::after,.cell.dw::after,.cell.tl::after,.cell.dl::after,.cell.star::after{position:absolute;font-size:0.45rem;font-weight:bold;color:rgba(0,0,0,0.55);pointer-events:none;line-height:1}
+        .cell.tw::after{content:'3Р'}.cell.dw::after{content:'2Р'}.cell.tl::after{content:'3С'}.cell.dl::after{content:'2С'}.cell.star::after{content:'★';font-size:0.8rem}
+        .cell.occupied.tw::after,.cell.occupied.dw::after,.cell.occupied.tl::after,.cell.occupied.dl::after,.cell.occupied.star::after{content:''}
+        .rack-container { background: #4a2c10; padding: 8px 12px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; width: 100%; max-width: 600px; }
+        .rack-label { font-weight: bold; color: #FFD700; font-size: 0.8rem; white-space: nowrap; }
+        .rack { display: flex; gap: 3px; flex-wrap: wrap; justify-content: center; }
+        .tile { width: 36px; height: 36px; background: linear-gradient(180deg,#fff9e6 0%,#f0d9a0 50%,#c89840 100%); border: 2px solid #7a5810; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; font-weight: bold; cursor: pointer; box-shadow: 0 3px 5px rgba(0,0,0,0.3); transition: all 0.2s; }
+        .tile:active { transform: scale(0.85); }
+        .tile.selected { border: 3px solid #FFD700; box-shadow: 0 0 15px rgba(255,215,0,0.8); transform: translateY(-6px); }
+        .score-display { display: flex; gap: 10px; font-size: 0.9rem; font-weight: bold; flex-wrap: wrap; justify-content: center; }
+        .score-item { background: rgba(0,0,0,0.35); padding: 6px 12px; border-radius: 8px; text-align: center; min-width: 60px; }
+        .score-item.active-player { border: 2px solid #FFD700; box-shadow: 0 0 10px rgba(255,215,0,0.5); }
+        .score-label { font-size: 0.65rem; opacity: 0.7; }
+        .controls { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+        button { padding: 8px 14px; border: none; border-radius: 18px; font-size: 0.8rem; font-weight: bold; cursor: pointer; transition: all 0.2s; letter-spacing: 0.5px; white-space: nowrap; }
+        .btn-success{background:#28a745;color:white}.btn-success:hover{background:#1e7e34}
+        .btn-danger{background:#dc3545;color:white}.btn-danger:hover{background:#bd2130}
+        .btn-secondary{background:#6c757d;color:white}.btn-secondary:hover{background:#545b62}
+        .btn-primary{background:#FFD700;color:#1a1a1a}.btn-primary:hover{background:#ffed4a}
+        .btn-warning{background:#ff9800;color:white}.btn-warning:hover{background:#e68900}
+        .btn-info{background:#17a2b8;color:white}.btn-info:hover{background:#138496}
+        button:disabled{opacity:0.4;cursor:not-allowed;transform:none!important}
+        .message-box { background: rgba(0,0,0,0.45); padding: 8px 12px; border-radius: 8px; text-align: center; font-size: 0.85rem; min-height: 36px; display: flex; align-items: center; justify-content: center; width: 100%; max-width: 600px; flex-wrap: wrap; gap: 4px; }
+        .message-box.error{color:#ff6b6b}.message-box.success{color:#51cf66}.message-box.info{color:#64b5f6}
+        .turn-indicator { font-size: 1rem; font-weight: bold; padding: 4px 12px; border-radius: 16px; animation: glowPulse 1.5s ease-in-out infinite; }
+        @keyframes glowPulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 100; }
+        .overlay-content { background: #2d6a2d; padding: 25px; border-radius: 15px; text-align: center; max-width: 400px; width: 90%; }
+        .overlay-content h2 { color: #FFD700; margin-bottom: 15px; }
+        .overlay-content input { padding: 10px; font-size: 1rem; border-radius: 8px; border: none; width: 100%; margin-bottom: 10px; text-align: center; }
+        .overlay-content .status { margin: 10px 0; font-size: 0.9rem; }
+        .connection-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+        .connection-dot.connected { background: #51cf66; }
+        .connection-dot.disconnected { background: #ff6b6b; }
+        .chat-area { width: 100%; max-width: 600px; margin-top: 4px; }
+        .chat-messages { background: rgba(0,0,0,0.3); border-radius: 8px; padding: 8px; max-height: 100px; overflow-y: auto; font-size: 0.75rem; margin-bottom: 4px; }
+        .chat-input-row { display: flex; gap: 4px; }
+        .chat-input-row input { flex: 1; padding: 6px 10px; border-radius: 15px; border: none; font-size: 0.8rem; background: rgba(255,255,255,0.9); }
+        .chat-input-row button { padding: 6px 12px; }
+        @media (max-width: 600px) {
+            :root{--cell-size:21px}
+            h1{font-size:1.2rem}
+            .tile{width:30px;height:30px;font-size:0.9rem}
+            button{padding:6px 10px;font-size:0.7rem}
+            .cell{font-size:0.65rem}
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🎯 Смехалица укрштеница</h1>
+    <p class="subtitle" id="connectionStatus">
+        <span class="connection-dot disconnected"></span> Повезивање...
+    </p>
+
+    <!-- Overlay za ime i pronalaženje igre -->
+    <div class="overlay" id="nameOverlay">
+        <div class="overlay-content">
+            <h2>🎯 Смехалица</h2>
+            <p style="margin-bottom:10px;">Унеси своје име:</p>
+            <input type="text" id="nameInput" placeholder="Твоје име" maxlength="20" value="Играч">
+            <br>
+            <button class="btn-primary" onclick="startFinding()" style="width:100%;padding:12px;">
+                🎮 ПРОНАЂИ ПРОТИВНИКА
+            </button>
+            <div class="status" id="findingStatus"></div>
+            <button class="btn-danger" id="cancelFindBtn" onclick="cancelFind()" style="display:none;width:100%;margin-top:8px;">
+                ❌ ОТКАЖИ
+            </button>
+        </div>
+    </div>
+
+    <div class="game-container" id="gameContainer" style="display:none;">
+        <div class="turn-indicator" id="turnIndicator">🔵 Чекам...</div>
+
+        <div class="score-display">
+            <div class="score-item active-player" id="yourScoreBox">
+                <div class="score-label" id="yourNameLabel">👤 Ти</div>
+                <div id="yourScore">0</div>
+            </div>
+            <div class="score-item" id="opponentScoreBox">
+                <div class="score-label" id="opponentNameLabel">🤖 Противник</div>
+                <div id="opponentScore">0</div>
+            </div>
+            <div class="score-item">
+                <div class="score-label">🎒 Врећица</div>
+                <div id="tilesLeft">98</div>
+            </div>
+        </div>
+
+        <div class="message-box" id="message">
+            📋 Чекам противника...
+        </div>
+
+        <div class="board-wrapper">
+            <div class="board" id="board"></div>
+        </div>
+
+        <div class="rack-container">
+            <span class="rack-label">🎴 Твоје:</span>
+            <div class="rack" id="rack"></div>
+        </div>
+
+        <div class="controls">
+            <button class="btn-success" id="btnSubmit" onclick="submitMove()">✅ ПОТВРДИ</button>
+            <button class="btn-danger" onclick="recallTiles()">↩ ВРАТИ</button>
+            <button class="btn-secondary" onclick="shuffleRack()">🔀 МЕШАЈ</button>
+            <button class="btn-warning" onclick="skipTurn()" id="btnSkip">⏭ ПРЕСКОЧИ</button>
+            <button class="btn-info" onclick="resignGame()">🏳 ПРЕДАЈА</button>
+        </div>
+
+        <!-- Chat -->
+        <div class="chat-area">
+            <div class="chat-messages" id="chatMessages"></div>
+            <div class="chat-input-row">
+                <input type="text" id="chatInput" placeholder="Порука..." maxlength="200" onkeypress="if(event.key==='Enter')sendChat()">
+                <button class="btn-secondary" onclick="sendChat()">📩</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== KONEKCIJA ====================
+        // Promeni na tvoj server URL!
+        const SERVER_URL = 'ws://localhost:3000';
+        let ws = null;
+        let playerId = null;
+        let gameId = null;
+        let myRack = [];
+        let isMyTurn = false;
+        let selectedTileIndex = null;
+        let newlyPlacedCells = [];
+        let gameActive = false;
+
+        // ==================== WEBSOCKET ====================
+        function connect() {
+            ws = new WebSocket(SERVER_URL);
+
+            ws.onopen = () => {
+                console.log('🔌 Povezan na server');
+                document.getElementById('connectionStatus').innerHTML =
+                    '<span class="connection-dot connected"></span> Повезан';
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const msg = JSON.parse(event.data);
+                    handleServerMessage(msg);
+                } catch (e) {
+                    console.error('Greška u parsiranju:', e);
+                }
+            };
+
+            ws.onclose = () => {
+                console.log('🔌 Veza prekinuta');
+                document.getElementById('connectionStatus').innerHTML =
+                    '<span class="connection-dot disconnected"></span> Прекинуто — osveži stranicu';
+                gameActive = false;
+            };
+
+            ws.onerror = (err) => {
+                console.error('WebSocket greška:', err);
+            };
+        }
+
+        function sendMessage(msg) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify(msg));
+            }
+        }
+
+        // ==================== HANDLERI SERVER PORUKA ====================
+        function handleServerMessage(msg) {
+            switch (msg.type) {
+                case 'connected':
+                    playerId = msg.playerId;
+                    console.log('🆔 Moj ID:', playerId);
+                    // Pošalji ping svakih 30s
+                    setInterval(() => sendMessage({ type: 'ping' }), 30000);
+                    break;
+
+                case 'finding_game':
+                    document.getElementById('findingStatus').textContent = msg.message + (msg.queuePosition ? ` (Позиција #${msg.queuePosition})` : '');
+                    break;
+
+                case 'find_cancelled':
+                    document.getElementById('findingStatus').textContent = msg.message;
+                    document.getElementById('cancelFindBtn').style.display = 'none';
+                    document.getElementById('nameInput').disabled = false;
+                    break;
+
+                case 'game_start':
+                    startGame(msg);
+                    break;
+
+                case 'move_result':
+                    updateGameState(msg);
+                    if (msg.lastMoveWords && msg.lastMoveWords.length > 0) {
+                        addChatSystemMsg(`${msg.lastMovePlayerName} игра: ${msg.lastMoveWords.join(', ')} (+${msg.lastMoveScore})`);
+                    }
+                    break;
+
+                case 'move_invalid':
+                    alert('❌ Неважећи потез: ' + msg.error);
+                    // Vrati pločice
+                    recallTiles();
+                    break;
+
+                case 'turn_skipped':
+                    updateGameState(msg);
+                    addChatSystemMsg(`${msg.skippedByName} прескаче потез.`);
+                    break;
+
+                case 'game_over':
+                    updateGameState(msg);
+                    showGameOver(msg);
+                    break;
+
+                case 'game_state':
+                    updateGameState(msg);
+                    break;
+
+                case 'chat_message':
+                    addChatMessage(msg.from, msg.text);
+                    break;
+
+                case 'pong':
+                    // Živ sam
+                    break;
+
+                case 'error':
+                    console.error('Server greška:', msg.message);
+                    break;
+            }
+        }
+
+        // ==================== UI FUNKCIJE ====================
+        function startFinding() {
+            const name = document.getElementById('nameInput').value.trim() || 'Играч';
+            sendMessage({ type: 'set_name', name: name });
+            sendMessage({ type: 'find_game' });
+            document.getElementById('cancelFindBtn').style.display = 'block';
+            document.getElementById('findingStatus').textContent = 'Тражим противника...';
+            document.getElementById('nameInput').disabled = true;
+        }
+
+        function cancelFind() {
+            sendMessage({ type: 'cancel_find' });
+            document.getElementById('cancelFindBtn').style.display = 'none';
+            document.getElementById('nameInput').disabled = false;
+        }
+
+        function startGame(msg) {
+            document.getElementById('nameOverlay').style.display = 'none';
+            document.getElementById('gameContainer').style.display = 'flex';
+            gameId = msg.gameId;
+            gameActive = true;
+
+            document.getElementById('yourNameLabel').textContent = '👤 Ти';
+            document.getElementById('opponentNameLabel').textContent = '🤖 ' + msg.opponentName;
+
+            updateGameState(msg);
+            setMessage('🎮 Игра почиње! ' + (msg.isYourTurn ? 'Ти си на потезу.' : 'Противник је на потезу.'), 'info');
+        }
+
+        function updateGameState(msg) {
+            if (msg.board) renderBoardFromState(msg.board);
+            if (msg.yourRack) myRack = [...msg.yourRack];
+            if (msg.yourScore !== undefined) document.getElementById('yourScore').textContent = msg.yourScore;
+            if (msg.opponentScore !== undefined) document.getElementById('opponentScore').textContent = msg.opponentScore;
+            if (msg.bagCount !== undefined) document.getElementById('tilesLeft').textContent = msg.bagCount;
+            if (msg.currentTurn !== undefined) {
+                isMyTurn = (msg.currentTurn === playerId);
+                updateTurnIndicator(msg.isYourTurn);
+                document.getElementById('btnSubmit').disabled = !isMyTurn;
+                document.getElementById('btnSkip').disabled = !isMyTurn;
+            }
+            if (msg.isYourTurn !== undefined) {
+                isMyTurn = msg.isYourTurn;
+                updateTurnIndicator(msg.isYourTurn);
+            }
+            if (msg.lastMove && msg.lastMove.placements) {
+                lastMoveCells = msg.lastMove.placements.map(p => ({ row: p.row, col: p.col }));
+            } else {
+                lastMoveCells = [];
+            }
+            newlyPlacedCells = [];
+            selectedTileIndex = null;
+            renderMyRack();
+        }
+
+        let lastMoveCells = [];
+
+        function renderBoardFromState(boardState) {
+            const boardEl = document.getElementById('board');
+            boardEl.innerHTML = '';
+
+            const bonusBoard = [
+                ['TW','','','DL','','','','TW','','','','DL','','','TW'],
+                ['','DW','','','','TL','','','','TL','','','','DW',''],
+                ['','','DW','','','','DL','','DL','','','','DW','',''],
+                ['DL','','','DW','','','','DL','','','','DW','','','DL'],
+                ['','','','','DW','','','','','','DW','','','',''],
+                ['','TL','','','','TL','','','','TL','','','','TL',''],
+                ['','','DL','','','','DL','','DL','','','','DL','',''],
+                ['TW','','','DL','','','','★','','','','DL','','','TW'],
+                ['','','DL','','','','DL','','DL','','','','DL','',''],
+                ['','TL','','','','TL','','','','TL','','','','TL',''],
+                ['','','','','DW','','','','','','DW','','','',''],
+                ['DL','','','DW','','','','DL','','','','DW','','','DL'],
+                ['','','DW','','','','DL','','DL','','','','DW','',''],
+                ['','DW','','','','TL','','','','TL','','','','DW',''],
+                ['TW','','','DL','','','','TW','','','','DL','','','TW'],
+            ];
+
+            for (let r = 0; r < 15; r++) {
+                for (let c = 0; c < 15; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    const bonus = bonusBoard[r][c];
+                    if (bonus === 'TW') cell.classList.add('tw');
+                    else if (bonus === 'DW') cell.classList.add('dw');
+                    else if (bonus === 'TL') cell.classList.add('tl');
+                    else if (bonus === 'DL') cell.classList.add('dl');
+                    else if (bonus === '★') cell.classList.add('star');
+
+                    if (boardState[r] && boardState[r][c]) {
+                        cell.textContent = boardState[r][c].letter;
+                        cell.classList.add('occupied');
+                        if (lastMoveCells.some(p => p.row === r && p.col === c)) {
+                            cell.classList.add('last-move');
+                        }
+                    }
+
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+                    cell.addEventListener('click', () => onCellClick(r, c, boardState));
+                    boardEl.appendChild(cell);
+                }
+            }
+        }
+
+        function renderMyRack() {
+            const rackEl = document.getElementById('rack');
+            rackEl.innerHTML = '';
+            myRack.forEach((letter, index) => {
+                const tile = document.createElement('div');
+                tile.className = 'tile';
+                if (index === selectedTileIndex) tile.classList.add('selected');
+                tile.textContent = letter;
+                tile.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    onRackClick(index);
+                });
+                rackEl.appendChild(tile);
+            });
+        }
+
+        function updateTurnIndicator(myTurn) {
+            const indicator = document.getElementById('turnIndicator');
+            const yBox = document.getElementById('yourScoreBox');
+            const oBox = document.getElementById('opponentScoreBox');
+
+            if (myTurn) {
+                indicator.textContent = '🔵 ТВОЈ ПОТЕЗ';
+                indicator.style.color = '#64b5f6';
+                yBox.classList.add('active-player');
+                oBox.classList.remove('active-player');
+            } else {
+                indicator.textContent = '🔴 ПРОТИВНИК НА ПОТЕЗУ';
+                indicator.style.color = '#ff6b6b';
+                yBox.classList.remove('active-player');
+                oBox.classList.add('active-player');
+            }
+        }
+
+        function setMessage(msg, type) {
+            const el = document.getElementById('message');
+            el.textContent = msg;
+            el.className = 'message-box';
+            if (type) el.classList.add(type);
+        }
+
+        // ==================== INTERAKCIJE SA TABLOM ====================
+        function onRackClick(index) {
+            if (!isMyTurn || !gameActive) return;
+            selectedTileIndex = (selectedTileIndex === index) ? null : index;
+            renderMyRack();
+        }
+
+        function onCellClick(row, col, boardState) {
+            if (!isMyTurn || !gameActive) {
+                setMessage('⏳ Није твој потез!', 'error');
+                return;
+            }
+
+            // Proveri da li je polje zauzeto STAROM pločicom
+            if (boardState[row] && boardState[row][col] &&
+                !newlyPlacedCells.some(p => p.row === row && p.col === col)) {
+                setMessage('⚠ То поље је већ заузето.', 'error');
+                return;
+            }
+
+            if (selectedTileIndex === null) {
+                // Skidanje pločice
+                const existingIdx = newlyPlacedCells.findIndex(p => p.row === row && p.col === col);
+                if (existingIdx >= 0) {
+                    myRack.push(newlyPlacedCells[existingIdx].letter);
+                    newlyPlacedCells.splice(existingIdx, 1);
+                    renderBoardFromState(boardState);
+                    renderMyRack();
+                    setMessage('↩ Плочица враћена.', '');
+                } else {
+                    setMessage('👆 Прво изабери плочицу са сталке!', 'error');
+                }
+                return;
+            }
+
+            // Ako već ima novopostavljenu, vrati je
+            const existingIdx = newlyPlacedCells.findIndex(p => p.row === row && p.col === col);
+            if (existingIdx >= 0) {
+                myRack.push(newlyPlacedCells[existingIdx].letter);
+                newlyPlacedCells.splice(existingIdx, 1);
+            }
+
+            const letter = myRack[selectedTileIndex];
+            newlyPlacedCells.push({ row, col, letter });
+            myRack.splice(selectedTileIndex, 1);
+            selectedTileIndex = null;
+
+            // Prikaži privremeno
+            const tempBoard = boardState.map(row => [...row]);
+            for (const p of newlyPlacedCells) {
+                if (!tempBoard[p.row]) tempBoard[p.row] = [];
+                tempBoard[p.row][p.col] = { letter: p.letter, isNewlyPlaced: true };
+            }
+            renderBoardFromState(tempBoard);
+            renderMyRack();
+            setMessage(`✅ Постављено "${letter}". Настави или потврди.`, 'success');
+        }
+
+        function recallTiles() {
+            if (!isMyTurn || !gameActive) return;
+            if (newlyPlacedCells.length === 0) {
+                setMessage('ℹ Нема новопостављених плочица.', '');
+                return;
+            }
+            for (const p of newlyPlacedCells) {
+                myRack.push(p.letter);
+            }
+            newlyPlacedCells = [];
+            selectedTileIndex = null;
+            sendMessage({ type: 'get_state' });
+        }
+
+        function shuffleRack() {
+            if (!isMyTurn || !gameActive) return;
+            for (let i = myRack.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [myRack[i], myRack[j]] = [myRack[j], myRack[i]];
+            }
+            selectedTileIndex = null;
+            renderMyRack();
+            setMessage('🔀 Плочице промешане.', '');
+        }
+
+        function submitMove() {
+            if (!isMyTurn || !gameActive) return;
+            if (newlyPlacedCells.length === 0) {
+                setMessage('⚠ Постави бар једно слово!', 'error');
+                return;
+            }
+
+            const placements = newlyPlacedCells.map(p => ({
+                row: p.row,
+                col: p.col,
+                letter: p.letter
+            }));
+
+            sendMessage({
+                type: 'place_tiles',
+                placements: placements
+            });
+
+            newlyPlacedCells = [];
+            selectedTileIndex = null;
+            setMessage('⏳ Шаљем потез...', 'info');
+        }
+
+        function skipTurn() {
+            if (!isMyTurn || !gameActive) return;
+            if (newlyPlacedCells.length > 0) {
+                if (!confirm('Имаш постављене плочице. Сигуран/на да желиш да прескочиш?')) return;
+                recallTiles();
+            }
+            sendMessage({ type: 'skip_turn' });
+            setMessage('⏭ Прескачеш потез...', 'info');
+        }
+
+        function resignGame() {
+            if (!gameActive) return;
+            if (!confirm('Сигуран/на да желиш да се предаш?')) return;
+            sendMessage({ type: 'resign' });
+        }
+
+        function showGameOver(msg) {
+            gameActive = false;
+            document.getElementById('btnSubmit').disabled = true;
+            document.getElementById('btnSkip').disabled = true;
+            setMessage('🏁 ' + (msg.resultMessage || 'Игра је завршена.'), 'info');
+
+            // Prikaži dugme za rematch
+            const controls = document.querySelector('.controls');
+            let rematchBtn = document.getElementById('rematchBtn');
+            if (!rematchBtn) {
+                rematchBtn = document.createElement('button');
+                rematchBtn.id = 'rematchBtn';
+                rematchBtn.className = 'btn-primary';
+                rematchBtn.textContent = '🔄 РЕВАНШ';
+                rematchBtn.onclick = () => {
+                    sendMessage({ type: 'rematch' });
+                    rematchBtn.remove();
+                };
+                controls.appendChild(rematchBtn);
+            }
+        }
+
+        // ==================== CHAT ====================
+        function sendChat() {
+            const input = document.getElementById('chatInput');
+            const text = input.value.trim();
+            if (!text) return;
+            sendMessage({ type: 'chat', text: text });
+            addChatMessage('Ти', text);
+            input.value = '';
+        }
+
+        function addChatMessage(from, text) {
+            const container = document.getElementById('chatMessages');
+            const div = document.createElement('div');
+            div.innerHTML = `<strong>${from}:</strong> ${escapeHtml(text)}`;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function addChatSystemMsg(text) {
+            const container = document.getElementById('chatMessages');
+            const div = document.createElement('div');
+            div.style.opacity = '0.7';
+            div.style.fontStyle = 'italic';
+            div.textContent = '🔹 ' + text;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // ==================== POKRETANJE ====================
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.tile') && !e.target.closest('#rack') && !e.target.closest('.cell')) {
+                selectedTileIndex = null;
+                renderMyRack();
+            }
+        });
+
+        connect();
+        console.log('🎯 Смехалица укрштеница — Multiplayer klijent spreman!');
+    </script>
+</body>
+</html>

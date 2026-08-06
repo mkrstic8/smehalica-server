@@ -1,0 +1,898 @@
+const WebSocket = require('ws');
+const { v4: uuidv4 } = require('uuid');
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
+// ==================== KONFIGURACIJA ====================
+const PORT = process.env.PORT || 3000;
+const BOARD_SIZE = 15;
+
+// Bonus tabla
+const bonusBoard = [
+    ['TW','','','DL','','','','TW','','','','DL','','','TW'],
+    ['','DW','','','','TL','','','','TL','','','','DW',''],
+    ['','','DW','','','','DL','','DL','','','','DW','',''],
+    ['DL','','','DW','','','','DL','','','','DW','','','DL'],
+    ['','','','','DW','','','','','','DW','','','',''],
+    ['','TL','','','','TL','','','','TL','','','','TL',''],
+    ['','','DL','','','','DL','','DL','','','','DL','',''],
+    ['TW','','','DL','','','','★','','','','DL','','','TW'],
+    ['','','DL','','','','DL','','DL','','','','DL','',''],
+    ['','TL','','','','TL','','','','TL','','','','TL',''],
+    ['','','','','DW','','','','','','DW','','','',''],
+    ['DL','','','DW','','','','DL','','','','DW','','','DL'],
+    ['','','DW','','','','DL','','DL','','','','DW','',''],
+    ['','DW','','','','TL','','','','TL','','','','DW',''],
+    ['TW','','','DL','','','','TW','','','','DL','','','TW'],
+];
+
+const letterValues = {
+    'А':1,'Б':3,'В':2,'Г':3,'Д':2,'Ђ':8,'Е':1,'Ж':5,'З':3,
+    'И':1,'Ј':3,'К':2,'Л':2,'Љ':5,'М':2,'Н':1,'Њ':5,'О':1,
+    'П':2,'Р':1,'С':1,'Т':1,'Ћ':10,'У':1,'Ф':5,'Х':4,'Ц':4,
+    'Ч':4,'Џ':8,'Ш':4
+};
+
+const tileDistribution = [
+    ['А',9],['Б',2],['В',4],['Г',2],['Д',4],['Ђ',1],['Е',9],
+    ['Ж',2],['З',2],['И',9],['Ј',3],['К',3],['Л',3],['Љ',1],
+    ['М',3],['Н',6],['Њ',1],['О',9],['П',3],['Р',6],['С',6],
+    ['Т',6],['Ћ',1],['У',4],['Ф',1],['Х',2],['Ц',2],['Ч',2],
+    ['Џ',1],['Ш',2]
+];
+
+// ==================== REČNIK ====================
+// Učitaj reči iz fajla (ili koristi ugrađeni demo set)
+let DICTIONARY = new Set();
+
+
+try {
+    const dictFile = fs.readFileSync('./serbian-words.txt', 'utf8');
+    const words = dictFile.split(/[\n\r]+/)
+        .map(w => w.trim().toUpperCase())
+        .filter(w => /^[АБВГДЂЕЖЗИЈКЛЉМНЊОПРСТЋУФХЦЧЏШ]+$/.test(w))
+        .filter(w => w.length >= 2 && w.length <= 15);
+    DICTIONARY = new Set(words);
+    console.log(`📚 Rečnik učitan: ${DICTIONARY.size} reči`);
+} catch (e) {
+    console.log('⚠️  Fajl rečnika nije pronađen. Koristim demo rečnik.');
+    // Demo rečnik
+    const demoWords = [
+        'АЛА','АЛАТ','БАР','БОРА','БРАТ','БРДО','ВАТРА','ВЕК','ВЕРА','ВЕТАР',
+        'ВИНО','ВОДА','ГЛАВА','ГОРА','ГОСТ','ГРАД','ГРОБ','ДА','ДАН','ДАР',
+        'ДВА','ДВОР','ДЕДА','ДЕЛО','ДОМ','ДРВО','ДУГ','ЖАБА','ЖАР','ЖЕНА',
+        'ЖИВОТ','ЖУТ','ЗА','ЗВЕР','ЗВОНО','ЗЕМЉА','ЗИД','ЗИМА','ЗЛАТО',
+        'ЗМИЈА','ЗНАК','И','ИВИЦА','ИГЛА','ИГРА','ИМЕ','ЈА','ЈЕ','ЈЕДАН',
+        'ЈЕЗЕРО','ЈЕЛЕН','ЈУГ','ЈУТРО','КА','КАД','КАКО','КАМЕН','КИША',
+        'КЊИГА','КО','КОД','КОРАК','КОСТ','КОЊ','КРАЈ','КРВ','КРИЛО',
+        'КРОЗ','КРУГ','КУЋА','ЛАВ','ЛАК','ЛЕД','ЛЕП','ЛЕТО','ЛИСТ','ЛИЦЕ',
+        'ЛОВ','МАГЛА','МАЛИ','МАЧ','МЕД','МЕСЕЦ','МИ','МИР','МЛЕКО',
+        'МНОГО','МОЈ','МОРЕ','МОСТ','МРАК','МУЖ','МУКА','НА','НАД',
+        'НАРОД','НЕ','НЕБО','НИ','НОВ','НОГА','НОЋ','НОС','ЊЕН','ЊИХ',
+        'О','ОБА','ОБЛАК','ОБРАЗ','ОВАЈ','ОД','ОКО','ОН','ОНА','ОПЕТ',
+        'ОТАЦ','ОЧИ','ПАД','ПАС','ПЕТ','ПИВО','ПИСМО','ПО','ПОД','ПОЉЕ',
+        'ПОСАО','ПРАВ','ПРЕ','ПРИЧА','ПРОЗОР','ПТИЦА','ПУТ','РАД','РАДОСТ',
+        'РАК','РАНА','РАТ','РЕД','РЕКА','РЕЧ','РИБА','РОД','РУЖА','РУКА',
+        'С','СА','САД','САМ','САН','САТ','СВЕТ','СВОЈ','СЕ','СЕЛО','СИЛА',
+        'СЛОВО','СМЕХ','СНЕГ','СО','СОБА','СРЦЕ','СТВАР','СТО','СУНЦЕ',
+        'ТА','ТАЈ','ТАМА','ТВОЈ','ТЕ','ТЕЛО','ТИ','ТО','ТРАГ','ТРИ',
+        'ТУГА','ЋЕ','ЋЕРКА','У','УВО','УЛИЦА','УМ','УХО','ХВАЛА','ХЛАД',
+        'ХЛЕБ','ХРАНА','ХРАСТ','ЦАР','ЦВЕТ','ЦЕНА','ЦРН','ЧАЈ','ЧАС',
+        'ЧЕТИРИ','ЧОВЕК','ЧУДО','ЏАК','ШАЛА','ШКОЛА','ШТА','ШУМА'
+    ];
+    DICTIONARY = new Set(demoWords);
+    console.log(`📚 Demo rečnik: ${DICTIONARY.size} reči`);
+}
+
+// ==================== STANJE IGARA ====================
+const games = {};        // gameId -> gameState
+const players = {};      // playerId -> { ws, gameId, playerNum, name }
+const matchmaking = [];  // igrači koji čekaju protivnika
+
+// ==================== POMOĆNE FUNKCIJE ====================
+function createBag() {
+    const bag = [];
+    for (const [letter, count] of tileDistribution) {
+        for (let i = 0; i < count; i++) bag.push(letter);
+    }
+    // Fisher-Yates shuffle
+    for (let i = bag.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [bag[i], bag[j]] = [bag[j], bag[i]];
+    }
+    return bag;
+}
+
+function drawTiles(bag, n) {
+    const drawn = [];
+    for (let i = 0; i < n; i++) {
+        if (bag.length > 0) drawn.push(bag.pop());
+    }
+    return drawn;
+}
+
+function createEmptyBoard() {
+    const board = [];
+    for (let r = 0; r < BOARD_SIZE; r++) {
+        board[r] = [];
+        for (let c = 0; c < BOARD_SIZE; c++) {
+            board[r][c] = null;
+        }
+    }
+    return board;
+}
+
+function createGame(player1Id, player2Id) {
+    const gameId = uuidv4().substring(0, 8).toUpperCase();
+    const bag = createBag();
+
+    const game = {
+        id: gameId,
+        board: createEmptyBoard(),
+        bag: bag,
+        players: {
+            [player1Id]: {
+                rack: drawTiles(bag, 7),
+                score: 0,
+                playerNum: 1
+            },
+            [player2Id]: {
+                rack: drawTiles(bag, 7),
+                score: 0,
+                playerNum: 2
+            }
+        },
+        currentTurn: player1Id,
+        isFirstMove: true,
+        status: 'active', // active, finished
+        winner: null,
+        lastMove: null,
+        turnStartTime: Date.now(),
+        createdAt: Date.now()
+    };
+
+    games[gameId] = game;
+
+    // Poveži igrače sa igrom
+    players[player1Id].gameId = gameId;
+    players[player1Id].playerNum = 1;
+    players[player2Id].gameId = gameId;
+    players[player2Id].playerNum = 2;
+
+    return game;
+}
+
+function getGameState(game, playerId) {
+    const opponentId = Object.keys(game.players).find(id => id !== playerId);
+    const player = game.players[playerId];
+    const opponent = game.players[opponentId];
+
+    return {
+        gameId: game.id,
+        board: game.board,
+        yourRack: player.rack,
+        yourScore: player.score,
+        opponentScore: opponent ? opponent.score : 0,
+        opponentRackCount: opponent ? opponent.rack.length : 0,
+        currentTurn: game.currentTurn,
+        isYourTurn: game.currentTurn === playerId,
+        isFirstMove: game.isFirstMove,
+        status: game.status,
+        winner: game.winner,
+        bagCount: game.bag.length,
+        lastMove: game.lastMove
+    };
+}
+
+// ==================== VALIDACIJA POTEZA ====================
+function validateMove(game, playerId, placements) {
+    if (game.currentTurn !== playerId) {
+        return { valid: false, error: 'Није твој потез.' };
+    }
+    if (game.status !== 'active') {
+        return { valid: false, error: 'Игра је завршена.' };
+    }
+    if (!placements || placements.length === 0) {
+        return { valid: false, error: 'Нема постављених слова.' };
+    }
+
+    const player = game.players[playerId];
+    const board = game.board;
+
+    // Proveri da li igrač ima ova slova
+    const neededLetters = [...player.rack];
+    const tempBoard = [];
+
+    for (const p of placements) {
+        const { row, col, letter } = p;
+        if (row < 0 || row >= BOARD_SIZE || col < 0 || col >= BOARD_SIZE) {
+            return { valid: false, error: `Неважећа позиција [${row+1},${col+1}].` };
+        }
+        if (board[row][col]) {
+            return { valid: false, error: `Поље [${row+1},${col+1}] је већ заузето.` };
+        }
+        const idx = neededLetters.indexOf(letter);
+        if (idx === -1) {
+            return { valid: false, error: `Немаш слово "${letter}" на сталку.` };
+        }
+        neededLetters.splice(idx, 1);
+        tempBoard.push({ row, col, letter });
+    }
+
+    // Postavi privremeno
+    for (const p of tempBoard) {
+        board[p.row][p.col] = { letter: p.letter, isNewlyPlaced: true };
+    }
+
+    // Proveri da li su sva slova u istom redu/koloni
+    const rows = tempBoard.map(p => p.row);
+    const cols = tempBoard.map(p => p.col);
+    const uniqueRows = [...new Set(rows)];
+    const uniqueCols = [...new Set(cols)];
+
+    if (uniqueRows.length !== 1 && uniqueCols.length !== 1) {
+        // Rollback
+        for (const p of tempBoard) board[p.row][p.col] = null;
+        return { valid: false, error: 'Сва слова морају бити у истом реду или колони.' };
+    }
+
+    const isHorizontal = uniqueRows.length === 1;
+    let mainWord = '';
+    let mainCells = [];
+
+    if (isHorizontal) {
+        const row = uniqueRows[0];
+        const minCol = Math.min(...cols);
+        const maxCol = Math.max(...cols);
+
+        // Proveri praznine
+        for (let c = minCol; c <= maxCol; c++) {
+            if (!board[row][c]) {
+                for (const p of tempBoard) board[p.row][p.col] = null;
+                return { valid: false, error: `Недостаје слово на [${row+1},${c+1}].` };
+            }
+        }
+
+        let startCol = minCol;
+        while (startCol > 0 && board[row][startCol - 1]) startCol--;
+        let endCol = maxCol;
+        while (endCol < BOARD_SIZE - 1 && board[row][endCol + 1]) endCol++;
+
+        for (let c = startCol; c <= endCol; c++) {
+            mainWord += board[row][c].letter;
+            mainCells.push({ row, col: c });
+        }
+    } else {
+        const col = uniqueCols[0];
+        const minRow = Math.min(...rows);
+        const maxRow = Math.max(...rows);
+
+        for (let r = minRow; r <= maxRow; r++) {
+            if (!board[r][col]) {
+                for (const p of tempBoard) board[p.row][p.col] = null;
+                return { valid: false, error: `Недостаје слово на [${r+1},${col+1}].` };
+            }
+        }
+
+        let startRow = minRow;
+        while (startRow > 0 && board[startRow - 1][col]) startRow--;
+        let endRow = maxRow;
+        while (endRow < BOARD_SIZE - 1 && board[endRow + 1][col]) endRow++;
+
+        for (let r = startRow; r <= endRow; r++) {
+            mainWord += board[r][col].letter;
+            mainCells.push({ row: r, col });
+        }
+    }
+
+    // Prvi potez — mora pokriti centar
+    if (game.isFirstMove) {
+        const coversCenter = tempBoard.some(p => p.row === 7 && p.col === 7);
+        if (!coversCenter) {
+            for (const p of tempBoard) board[p.row][p.col] = null;
+            return { valid: false, error: 'Први потез мора покрити центар (★).' };
+        }
+    } else {
+        // Mora biti povezano sa postojećim rečima
+        let connected = false;
+        for (const p of tempBoard) {
+            const neighbors = [[p.row-1,p.col],[p.row+1,p.col],[p.row,p.col-1],[p.row,p.col+1]];
+            for (const [nr, nc] of neighbors) {
+                if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE &&
+                    board[nr][nc] && !board[nr][nc].isNewlyPlaced) {
+                    connected = true;
+                    break;
+                }
+            }
+            if (connected) break;
+        }
+        if (!connected) {
+            for (const p of tempBoard) board[p.row][p.col] = null;
+            return { valid: false, error: 'Мора бити повезано са постојећим речима.' };
+        }
+    }
+
+    // Sakupljanje svih formiranih reči
+    const allWords = [{ word: mainWord, cells: mainCells }];
+
+    // Unakrsne reči
+    for (const p of tempBoard) {
+        if (isHorizontal) {
+            let sr = p.row;
+            while (sr > 0 && board[sr - 1][p.col]) sr--;
+            let er = p.row;
+            while (er < BOARD_SIZE - 1 && board[er + 1][p.col]) er++;
+            if (er > sr) {
+                let cw = '';
+                const cells = [];
+                for (let r = sr; r <= er; r++) {
+                    cw += board[r][p.col].letter;
+                    cells.push({ row: r, col: p.col });
+                }
+                if (cw !== mainWord) allWords.push({ word: cw, cells });
+            }
+        } else {
+            let sc = p.col;
+            while (sc > 0 && board[p.row][sc - 1]) sc--;
+            let ec = p.col;
+            while (ec < BOARD_SIZE - 1 && board[p.row][ec + 1]) ec++;
+            if (ec > sc) {
+                let cw = '';
+                const cells = [];
+                for (let c = sc; c <= ec; c++) {
+                    cw += board[p.row][c].letter;
+                    cells.push({ row: p.row, col: c });
+                }
+                if (cw !== mainWord) allWords.push({ word: cw, cells });
+            }
+        }
+    }
+
+    // Proveri rečnik
+    const invalidWords = [];
+    for (const w of allWords) {
+        if (w.word.length < 2) {
+            invalidWords.push(`"${w.word}" (прекратко)`);
+        } else if (!DICTIONARY.has(w.word.toUpperCase())) {
+            invalidWords.push(`"${w.word}" (није у речнику)`);
+        }
+    }
+
+    if (invalidWords.length > 0) {
+        for (const p of tempBoard) board[p.row][p.col] = null;
+        return { valid: false, error: 'Неважеће речи: ' + invalidWords.join(', ') };
+    }
+
+    // Izračunaj skor
+    let totalScore = 0;
+    for (const w of allWords) {
+        let wordScore = 0;
+        let wordMultiplier = 1;
+        for (const { row, col } of w.cells) {
+            let lv = letterValues[board[row][col].letter] || 1;
+            const isNew = tempBoard.some(p => p.row === row && p.col === col);
+            if (isNew) {
+                const bonus = bonusBoard[row][col];
+                if (bonus === 'DL') lv *= 2;
+                if (bonus === 'TL') lv *= 3;
+                if (bonus === 'DW') wordMultiplier *= 2;
+                if (bonus === 'TW') wordMultiplier *= 3;
+                if (bonus === '★') wordMultiplier *= 2;
+            }
+            wordScore += lv;
+        }
+        totalScore += wordScore * wordMultiplier;
+    }
+
+    if (tempBoard.length === 7) totalScore += 50; // BINGO bonus
+
+    // Finalizuj — ukloni isNewlyPlaced flag
+    for (const p of tempBoard) {
+        board[p.row][p.col] = { letter: p.letter, isNewlyPlaced: false };
+    }
+
+    // Ukloni slova sa stalka i dodaj nova
+    const remainingRack = [...neededLetters];
+    const newTiles = drawTiles(game.bag, tempBoard.length);
+    const newRack = [...remainingRack, ...newTiles];
+
+    return {
+        valid: true,
+        score: totalScore,
+        words: allWords.map(w => w.word),
+        newRack: newRack,
+        placements: tempBoard
+    };
+}
+
+// ==================== WEBSOCKET SERVER ====================
+const server = http.createServer((req, res) => {
+    // Serviraj index.html za glavnu stranicu
+    if (req.url === '/' || req.url === '/index.html') {
+        const filePath = path.join(__dirname, 'public', 'index.html');
+        try {
+            const html = fs.readFileSync(filePath, 'utf8');
+            res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+            res.end(html);
+        } catch (e) {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                server: 'Смехалица укрштеница',
+                version: '1.0.0',
+                error: 'HTML fajl nije pronađen. Kreiraj public/index.html'
+            }));
+        }
+    }
+    // Status endpoint
+    else if (req.url === '/status') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+            server: 'Смехалица укрштеница',
+            version: '1.0.0',
+            activeGames: Object.keys(games).length,
+            playersOnline: Object.keys(players).length,
+            dictionarySize: DICTIONARY.size
+        }));
+    }
+    else {
+        res.writeHead(404);
+        res.end('Stranica ne postoji');
+    }
+});
+
+const wss = new WebSocket.Server({ server });
+
+wss.on('connection', (ws) => {
+    const playerId = uuidv4();
+    players[playerId] = { ws, gameId: null, playerNum: null, name: 'Играч' };
+
+    console.log(`🔌 Играч повезан: ${playerId.substring(0, 8)}`);
+
+    // Pošalji ID igraču
+    send(ws, {
+        type: 'connected',
+        playerId: playerId,
+        message: 'Повезан/а на сервер Смехалице!'
+    });
+
+    ws.on('message', (data) => {
+        try {
+            const message = JSON.parse(data.toString());
+            handleMessage(playerId, message);
+        } catch (e) {
+            console.error('❌ Greška u parsiranju poruke:', e);
+            send(ws, { type: 'error', message: 'Неважећи формат поруке.' });
+        }
+    });
+
+    ws.on('close', () => {
+        console.log(`🔌 Играч искључен: ${playerId.substring(0, 8)}`);
+        handleDisconnect(playerId);
+        delete players[playerId];
+    });
+
+    ws.on('error', (err) => {
+        console.error(`❌ WebSocket greška za ${playerId.substring(0, 8)}:`, err.message);
+    });
+});
+
+function send(ws, message) {
+    if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(message));
+    }
+}
+
+function sendToPlayer(playerId, message) {
+    const player = players[playerId];
+    if (player && player.ws) {
+        send(player.ws, message);
+    }
+}
+
+function broadcastToGame(gameId, message, excludePlayerId = null) {
+    const game = games[gameId];
+    if (!game) return;
+    for (const pid of Object.keys(game.players)) {
+        if (pid !== excludePlayerId) {
+            sendToPlayer(pid, message);
+        }
+    }
+}
+
+// ==================== HANDLERI PORUKA ====================
+function handleMessage(playerId, message) {
+    const { type } = message;
+
+    switch (type) {
+        case 'set_name':
+            if (players[playerId]) {
+                players[playerId].name = message.name || 'Играч';
+                sendToPlayer(playerId, {
+                    type: 'name_set',
+                    name: players[playerId].name
+                });
+            }
+            break;
+
+        case 'find_game':
+            handleFindGame(playerId);
+            break;
+
+        case 'cancel_find':
+            handleCancelFind(playerId);
+            break;
+
+        case 'place_tiles':
+            handlePlaceTiles(playerId, message.placements);
+            break;
+
+        case 'skip_turn':
+            handleSkipTurn(playerId);
+            break;
+
+        case 'get_state':
+            handleGetState(playerId);
+            break;
+
+        case 'resign':
+            handleResign(playerId);
+            break;
+
+        case 'chat':
+            handleChat(playerId, message.text);
+            break;
+
+        case 'rematch':
+            handleRematch(playerId);
+            break;
+
+        case 'ping':
+            sendToPlayer(playerId, { type: 'pong' });
+            break;
+
+        default:
+            sendToPlayer(playerId, {
+                type: 'error',
+                message: `Непознат тип поруке: ${type}`
+            });
+    }
+}
+
+function handleFindGame(playerId) {
+    const player = players[playerId];
+    if (!player) return;
+
+    // Ako je već u igri
+    if (player.gameId) {
+        sendToPlayer(playerId, {
+            type: 'error',
+            message: 'Већ си у игри.'
+        });
+        return;
+    }
+
+    // Ukloni iz matchmaking-a ako već čeka
+    const existingIndex = matchmaking.indexOf(playerId);
+    if (existingIndex >= 0) {
+        matchmaking.splice(existingIndex, 1);
+    }
+
+    // Pokušaj da nađeš protivnika
+    if (matchmaking.length > 0) {
+        const opponentId = matchmaking.shift();
+
+        // Proveri da li je opponent još uvek dostupan
+        if (!players[opponentId] || players[opponentId].gameId) {
+            // Opponent više nije dostupan, traži dalje
+            matchmaking.push(playerId);
+            sendToPlayer(playerId, {
+                type: 'finding_game',
+                message: 'Тражим противника...'
+            });
+            return;
+        }
+
+        // Kreiraj igru
+        const game = createGame(playerId, opponentId);
+
+        // Obavesti oba igrača
+        const state1 = getGameState(game, playerId);
+        state1.type = 'game_start';
+        state1.opponentName = players[opponentId].name;
+        state1.yourPlayerNum = 1;
+        sendToPlayer(playerId, state1);
+
+        const state2 = getGameState(game, opponentId);
+        state2.type = 'game_start';
+        state2.opponentName = players[playerId].name;
+        state2.yourPlayerNum = 2;
+        sendToPlayer(opponentId, state2);
+
+        console.log(`🎮 Игра ${game.id}: ${players[playerId].name} vs ${players[opponentId].name}`);
+
+    } else {
+        // Nema protivnika, dodaj u red čekanja
+        matchmaking.push(playerId);
+        sendToPlayer(playerId, {
+            type: 'finding_game',
+            message: 'Тражим противника... Чека се.',
+            queuePosition: matchmaking.length
+        });
+        console.log(`⏳ ${player.name || playerId.substring(0,8)} чека противника (ред: ${matchmaking.length})`);
+    }
+}
+
+function handleCancelFind(playerId) {
+    const index = matchmaking.indexOf(playerId);
+    if (index >= 0) {
+        matchmaking.splice(index, 1);
+        sendToPlayer(playerId, {
+            type: 'find_cancelled',
+            message: 'Претрага отказана.'
+        });
+    }
+}
+
+function handlePlaceTiles(playerId, placements) {
+    const player = players[playerId];
+    if (!player || !player.gameId) {
+        sendToPlayer(playerId, { type: 'error', message: 'Ниси у игри.' });
+        return;
+    }
+
+    const game = games[player.gameId];
+    if (!game) {
+        sendToPlayer(playerId, { type: 'error', message: 'Игра не постоји.' });
+        return;
+    }
+
+    const result = validateMove(game, playerId, placements);
+
+    if (!result.valid) {
+        sendToPlayer(playerId, {
+            type: 'move_invalid',
+            error: result.error
+        });
+        return;
+    }
+
+    // Ažuriraj stanje igre
+    game.players[playerId].rack = result.newRack;
+    game.players[playerId].score += result.score;
+    game.isFirstMove = false;
+    game.lastMove = {
+        playerId: playerId,
+        words: result.words,
+        score: result.score,
+        placements: result.placements
+    };
+    game.turnStartTime = Date.now();
+
+    // Promeni redosled
+    const opponentId = Object.keys(game.players).find(id => id !== playerId);
+    game.currentTurn = opponentId;
+
+    // Proveri kraj igre
+    let gameOver = false;
+    let winner = null;
+
+    if (game.bag.length === 0) {
+        const p1Rack = game.players[playerId].rack;
+        const p2Rack = game.players[opponentId].rack;
+
+        if (p1Rack.length === 0 || p2Rack.length === 0) {
+            gameOver = true;
+            // Oduzmi preostale pločice
+            let p1Deduction = 0, p2Deduction = 0;
+            for (const l of p1Rack) p1Deduction += letterValues[l] || 0;
+            for (const l of p2Rack) p2Deduction += letterValues[l] || 0;
+            game.players[playerId].score -= p1Deduction;
+            game.players[opponentId].score -= p2Deduction;
+
+            const p1Score = game.players[playerId].score;
+            const p2Score = game.players[opponentId].score;
+
+            if (p1Score > p2Score) winner = playerId;
+            else if (p2Score > p1Score) winner = opponentId;
+            else winner = 'draw';
+
+            game.status = 'finished';
+            game.winner = winner;
+        }
+    }
+
+    // Obavesti oba igrača
+    for (const pid of Object.keys(game.players)) {
+        const state = getGameState(game, pid);
+        state.type = 'move_result';
+        state.lastMovePlayerName = players[playerId].name;
+        state.lastMoveWords = result.words;
+        state.lastMoveScore = result.score;
+
+        if (gameOver) {
+            state.type = 'game_over';
+            state.gameOver = true;
+            if (winner === 'draw') {
+                state.resultMessage = '🤝 Нерешено!';
+            } else if (winner === pid) {
+                state.resultMessage = '🎉 Победио/ла си!';
+            } else {
+                state.resultMessage = '😞 Изгубио/ла си.';
+            }
+            state.finalScores = {
+                you: game.players[pid].score,
+                opponent: game.players[opponentId].score
+            };
+        }
+
+        sendToPlayer(pid, state);
+    }
+
+    console.log(`🎯 Igra ${game.id}: ${players[playerId].name} igra ${result.words.join(', ')} (+${result.score})`);
+}
+
+function handleSkipTurn(playerId) {
+    const player = players[playerId];
+    if (!player || !player.gameId) return;
+
+    const game = games[player.gameId];
+    if (!game || game.currentTurn !== playerId) return;
+
+    const opponentId = Object.keys(game.players).find(id => id !== playerId);
+    game.currentTurn = opponentId;
+    game.turnStartTime = Date.now();
+    game.lastMove = {
+        playerId: playerId,
+        words: [],
+        score: 0,
+        skipped: true
+    };
+
+    for (const pid of Object.keys(game.players)) {
+        const state = getGameState(game, pid);
+        state.type = 'turn_skipped';
+        state.skippedByName = players[playerId].name;
+        sendToPlayer(pid, state);
+    }
+
+    console.log(`⏭ Igra ${game.id}: ${players[playerId].name} preskače`);
+}
+
+function handleGetState(playerId) {
+    const player = players[playerId];
+    if (!player || !player.gameId) {
+        sendToPlayer(playerId, { type: 'error', message: 'Ниси у игри.' });
+        return;
+    }
+
+    const game = games[player.gameId];
+    if (!game) {
+        sendToPlayer(playerId, { type: 'error', message: 'Игра не постоји.' });
+        return;
+    }
+
+    const state = getGameState(game, playerId);
+    state.type = 'game_state';
+    state.opponentName = players[Object.keys(game.players).find(id => id !== playerId)]?.name || 'Противник';
+    sendToPlayer(playerId, state);
+}
+
+function handleResign(playerId) {
+    const player = players[playerId];
+    if (!player || !player.gameId) return;
+
+    const game = games[player.gameId];
+    if (!game || game.status !== 'active') return;
+
+    const opponentId = Object.keys(game.players).find(id => id !== playerId);
+    game.status = 'finished';
+    game.winner = opponentId;
+
+    for (const pid of Object.keys(game.players)) {
+        const state = getGameState(game, pid);
+        state.type = 'game_over';
+        state.gameOver = true;
+        state.resignedByName = players[playerId].name;
+        state.resultMessage = pid === opponentId ? '🎉 Противник је одустао! Победио/ла си!' : '🏳 Предао/ла си се.';
+        sendToPlayer(pid, state);
+    }
+
+    console.log(`🏳 Igra ${game.id}: ${players[playerId].name} predaje`);
+}
+
+function handleChat(playerId, text) {
+    const player = players[playerId];
+    if (!player || !player.gameId) return;
+
+    const game = games[player.gameId];
+    if (!game) return;
+
+    broadcastToGame(player.gameId, {
+        type: 'chat_message',
+        from: player.name,
+        fromId: playerId,
+        text: text.substring(0, 200), // max 200 karaktera
+        timestamp: Date.now()
+    });
+}
+
+function handleRematch(playerId) {
+    const player = players[playerId];
+    if (!player || !player.gameId) return;
+
+    const game = games[player.gameId];
+    if (!game || game.status !== 'finished') return;
+
+    const opponentId = Object.keys(game.players).find(id => id !== playerId);
+
+    // Iniciraj rematch — kreiraj novu igru sa istim igračima
+    const newGame = createGame(playerId, opponentId);
+
+    for (const pid of [playerId, opponentId]) {
+        const state = getGameState(newGame, pid);
+        state.type = 'game_start';
+        state.opponentName = players[pid === playerId ? opponentId : playerId].name;
+        state.yourPlayerNum = pid === playerId ? 1 : 2;
+        state.isRematch = true;
+        sendToPlayer(pid, state);
+    }
+
+    // Očisti staru igru
+    delete games[game.id];
+
+    console.log(`🔄 Rematch: ${newGame.id}`);
+}
+
+function handleDisconnect(playerId) {
+    const player = players[playerId];
+    if (!player) return;
+
+    // Ukloni iz matchmaking-a
+    const mmIndex = matchmaking.indexOf(playerId);
+    if (mmIndex >= 0) matchmaking.splice(mmIndex, 1);
+
+    // Ako je u igri
+    if (player.gameId) {
+        const game = games[player.gameId];
+        if (game && game.status === 'active') {
+            const opponentId = Object.keys(game.players).find(id => id !== playerId);
+            game.status = 'finished';
+            game.winner = opponentId;
+
+            sendToPlayer(opponentId, {
+                type: 'game_over',
+                gameOver: true,
+                resultMessage: '🎉 Противник је искључен. Победио/ла си!',
+                opponentDisconnected: true
+            });
+
+            console.log(`🔌 Igra ${game.id} prekinuta — igrač se isključio`);
+        }
+    }
+}
+
+// ==================== PERIODIČNO ČIŠĆENJE ====================
+setInterval(() => {
+    const now = Date.now();
+    const timeout = 30 * 60 * 1000; // 30 minuta
+
+    for (const [gameId, game] of Object.entries(games)) {
+        // Očisti završene igre starije od 30 min
+        if (game.status === 'finished' && now - game.createdAt > timeout) {
+            delete games[gameId];
+            console.log(`🧹 Očišćena igra ${gameId}`);
+        }
+    }
+}, 5 * 60 * 1000); // Svakih 5 minuta
+
+// ==================== POKRETANJE ====================
+server.listen(PORT, () => {
+    console.log('═══════════════════════════════════════════');
+    console.log('🎯 СМЕХАЛИЦА УКРШТЕНИЦА - СЕРВЕР');
+    console.log('═══════════════════════════════════════════');
+    console.log(`🚀 Server pokrenut na portu ${PORT}`);
+    console.log(`📚 Rečnik: ${DICTIONARY.size} reči`);
+    console.log(`🔌 WebSocket: ws://localhost:${PORT}`);
+    console.log(`🌐 HTTP: http://localhost:${PORT}`);
+    console.log('═══════════════════════════════════════════');
+});
