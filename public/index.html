@@ -205,7 +205,8 @@
     <script>
         // ==================== KONEKCIJA ====================
         const SERVER_URL = 'wss://smehalica-server.onrender.com';
-                // ==================== ZVUCI (Web Audio API) ====================
+        
+        // ==================== ZVUCI (Web Audio API) ====================
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         let audioCtx = null;
         
@@ -230,31 +231,25 @@
             } catch(e) {}
         }
         
-        function sfxPlace() {
-            playTone(600, 0.1, 'sine', 0.08);
-        }
-        
+        function sfxPlace() { playTone(600, 0.1, 'sine', 0.08); }
         function sfxValid() {
             playTone(523, 0.15, 'sine', 0.1);
             setTimeout(() => playTone(659, 0.15, 'sine', 0.1), 150);
             setTimeout(() => playTone(784, 0.25, 'sine', 0.12), 300);
         }
-        
         function sfxInvalid() {
             playTone(200, 0.3, 'sawtooth', 0.06);
             setTimeout(() => playTone(150, 0.3, 'sawtooth', 0.06), 200);
         }
-        
         function sfxWin() {
-            const notes = [523, 659, 784, 1047];
-            notes.forEach((n, i) => setTimeout(() => playTone(n, 0.3, 'sine', 0.12), i * 200));
+            [523, 659, 784, 1047].forEach((n, i) => setTimeout(() => playTone(n, 0.3, 'sine', 0.12), i * 200));
         }
-        
         function sfxOpponent() {
             playTone(400, 0.15, 'triangle', 0.05);
             setTimeout(() => playTone(350, 0.15, 'triangle', 0.05), 150);
         }
-                // ==================== ANIMACIJE ====================
+        
+        // ==================== ANIMACIJE ====================
         function animateCell(row, col, animClass) {
             const cell = document.querySelector(`.cell[data-row="${row}"][data-col="${col}"]`);
             if (cell) {
@@ -279,18 +274,25 @@
         
         function spawnConfetti() {
             const colors = ['#ff0','#f00','#0f0','#00f','#f0f','#0ff','#ffa500','#ff69b4'];
-            for (let i = 0; i < 30; i++) {
+            for (let i = 0; i < 40; i++) {
                 setTimeout(() => {
                     const piece = document.createElement('div');
                     piece.className = 'confetti-piece';
-                    piece.style.left = Math.random() * 100 + '%';
-                    piece.style.top = Math.random() * 40 + '%';
-                    piece.style.background = colors[Math.floor(Math.random() * colors.length)];
-                    piece.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
-                    piece.style.animationDuration = (1.5 + Math.random() * 2) + 's';
+                    piece.style.cssText = `
+                        position: fixed;
+                        left: ${Math.random() * 100}%;
+                        top: ${Math.random() * 40}%;
+                        width: 12px;
+                        height: 12px;
+                        background: ${colors[Math.floor(Math.random() * colors.length)]};
+                        z-index: 9999;
+                        pointer-events: none;
+                        animation: confetti ${1.5 + Math.random() * 2}s ease-out forwards;
+                        border-radius: ${Math.random() > 0.5 ? '50%' : '2px'};
+                    `;
                     document.body.appendChild(piece);
                     setTimeout(() => piece.remove(), 3500);
-                }, i * 30);
+                }, i * 25);
             }
         }
         
@@ -301,6 +303,8 @@
                 setTimeout(() => rack.classList.remove('rack-highlight'), 2500);
             }
         }
+        
+        // ==================== STANJE ====================
         let ws = null;
         let playerId = null;
         let gameId = null;
@@ -310,8 +314,10 @@
         let newlyPlacedCells = [];
         let gameActive = false;
         let gameIsOver = false;
+        let lastMoveCells = [];
+        let currentBoardState = null;
+        let myName = 'Играч';
 
-        // FIX #2: Vrednosti slova sa prikazom poena
         const letterValues = {
             'А':1,'Б':3,'В':2,'Г':3,'Д':2,'Ђ':8,'Е':1,'Ж':5,'З':3,
             'И':1,'Ј':3,'К':2,'Л':2,'Љ':5,'М':2,'Н':1,'Њ':5,'О':1,
@@ -369,15 +375,31 @@
                 case 'move_result':
                     updateGameState(msg);
                     if (msg.lastMoveWords && msg.lastMoveWords.length > 0) {
-                        addChatSystemMsg(`${msg.lastMovePlayerName} игра: ${msg.lastMoveWords.join(', ')} (+${msg.lastMoveScore})`);
-                        // Animacije za protivnikov potez
-                        if (msg.currentTurn === playerId) {
+                        const isMyMove = msg.lastMovePlayerName === myName;
+                        if (isMyMove) {
+                            sfxValid();
+                            // Animacije za moja slova
+                            if (msg.lastMove && msg.lastMove.placements) {
+                                msg.lastMove.placements.forEach(p => {
+                                    animateCell(p.row, p.col, 'bounce');
+                                    const cellEl = document.querySelector(`.cell[data-row="${p.row}"][data-col="${p.col}"]`);
+                                    if (cellEl) {
+                                        const rect = cellEl.getBoundingClientRect();
+                                        spawnParticles(rect.left + rect.width/2, rect.top + rect.height/2, '#FFD700', 8);
+                                    }
+                                });
+                            }
+                            addChatSystemMsg(`🎯 Ти играш: ${msg.lastMoveWords.join(', ')} (+${msg.lastMoveScore})`);
+                        } else {
                             sfxOpponent();
+                            addChatSystemMsg(`${msg.lastMovePlayerName} игра: ${msg.lastMoveWords.join(', ')} (+${msg.lastMoveScore})`);
                         }
                     }
                     break;
                 case 'move_invalid':
                     sfxInvalid();
+                    // Shake animacija na novopostavljenim ćelijama
+                    newlyPlacedCells.forEach(p => animateCell(p.row, p.col, 'shake'));
                     alert('❌ Неважећи потез: ' + msg.error);
                     requestStateFromServer();
                     break;
@@ -385,7 +407,7 @@
                     updateGameState(msg);
                     addChatSystemMsg(`${msg.skippedByName} прескаче потез.`);
                     break;
-                               case 'game_over':
+                case 'game_over':
                     updateGameState(msg);
                     showGameOver(msg);
                     if (msg.resultMessage && msg.resultMessage.includes('Победио')) {
@@ -403,11 +425,10 @@
                 case 'error':
                     console.error('Server greška:', msg.message);
                     break;
-                                    case 'rematch_request':
+                case 'rematch_request':
                     showRematchRequest(msg);
                     break;
                 case 'rematch_accepted':
-                    // Sakrij request overlay ako postoji
                     hideRematchRequest();
                     addChatSystemMsg('🔄 Реванш прихваћен! Нова игра почиње.');
                     break;
@@ -425,8 +446,8 @@
 
         // ==================== UI ====================
         function startFinding() {
-            const name = document.getElementById('nameInput').value.trim() || 'Играч';
-            sendMessage({ type: 'set_name', name: name });
+            myName = document.getElementById('nameInput').value.trim() || 'Играч';
+            sendMessage({ type: 'set_name', name: myName });
             sendMessage({ type: 'find_game' });
             document.getElementById('cancelFindBtn').style.display = 'block';
             document.getElementById('findingStatus').textContent = 'Тражим противника...';
@@ -481,9 +502,6 @@
             renderMyRack();
         }
 
-        let lastMoveCells = [];
-        let currentBoardState = null;
-
         function renderBoardFromState(boardState) {
             currentBoardState = boardState;
             const boardEl = document.getElementById('board');
@@ -532,7 +550,6 @@
                     boardEl.appendChild(cell);
                 }
             }
-            // Takođe prikaži privremeno postavljene pločice
             for (const p of newlyPlacedCells) {
                 const cell = boardEl.querySelector(`[data-row="${p.row}"][data-col="${p.col}"]`);
                 if (cell) {
@@ -548,7 +565,6 @@
             myRack.forEach((letter, index) => {
                 const wrapper = document.createElement('div');
                 wrapper.className = 'tile-wrapper';
-
                 const tile = document.createElement('div');
                 tile.className = 'tile';
                 if (index === selectedTileIndex) tile.classList.add('selected');
@@ -557,13 +573,9 @@
                     e.stopPropagation();
                     onRackClick(index);
                 });
-
-                // FIX #2: Prikaz poena ispod svake pločice
                 const points = document.createElement('div');
                 points.className = 'tile-point';
-                const pointVal = letterValues[letter] || 0;
-                points.textContent = pointVal;
-
+                points.textContent = letterValues[letter] || 0;
                 wrapper.appendChild(tile);
                 wrapper.appendChild(points);
                 rackEl.appendChild(wrapper);
@@ -574,10 +586,7 @@
             const indicator = document.getElementById('turnIndicator');
             const yBox = document.getElementById('yourScoreBox');
             const oBox = document.getElementById('opponentScoreBox');
-
-            // FIX #1: Ukloni sve klase, pa dodaj odgovarajuću
             indicator.classList.remove('your-turn', 'opponent-turn', 'game-over-state');
-
             if (gameIsOver) {
                 indicator.textContent = '🏁 КРАЈ ИГРЕ';
                 indicator.classList.add('game-over-state');
@@ -615,15 +624,12 @@
                 setMessage('⏳ Није твој потез!', 'error');
                 return;
             }
-
             const boardState = currentBoardState;
             const isOccupiedPermanently = boardState && boardState[row] && boardState[row][col];
             const isNewlyPlacedByMe = newlyPlacedCells.some(p => p.row === row && p.col === col);
 
-            // FIX #4: Ako nema izabrane pločice sa stalka
             if (selectedTileIndex === null) {
                 if (isNewlyPlacedByMe) {
-                    // Vrati pločicu na stalak
                     const existingIdx = newlyPlacedCells.findIndex(p => p.row === row && p.col === col);
                     if (existingIdx >= 0) {
                         myRack.push(newlyPlacedCells[existingIdx].letter);
@@ -639,14 +645,10 @@
                 }
                 return;
             }
-
-            // Ako je polje trajno zauzeto
             if (isOccupiedPermanently && !isNewlyPlacedByMe) {
                 setMessage('⚠ То поље је већ заузето.', 'error');
                 return;
             }
-
-            // Ako već ima novopostavljenu pločicu na tom polju — vrati je prvo
             if (isNewlyPlacedByMe) {
                 const existingIdx = newlyPlacedCells.findIndex(p => p.row === row && p.col === col);
                 if (existingIdx >= 0) {
@@ -654,34 +656,29 @@
                     newlyPlacedCells.splice(existingIdx, 1);
                 }
             }
-
-            // Postavi novu pločicu
             const letter = myRack[selectedTileIndex];
             newlyPlacedCells.push({ row, col, letter });
             myRack.splice(selectedTileIndex, 1);
             selectedTileIndex = null;
-
             renderBoardFromState(boardState);
             renderMyRack();
-            sfxPlace();  // ← DODAJ OVDE
-            setMessage(`✅ Постављено "${letter}" (${letterValues[letter] || 0} поен${letterValues[letter] === 1 ? '' : 'а'}). Настави или потврди.`, 'success');
+            sfxPlace();
+            animateCell(row, col, 'bounce');
+            setMessage(`✅ Постављено "${letter}" (${letterValues[letter] || 0} поен${letterValues[letter] === 1 ? '' : 'а'}).`, 'success');
         }
 
         function recallTiles() {
             if (!isMyTurn || !gameActive || gameIsOver) return;
-            // FIX #4: Uvek dozvoli vraćanje ako ima novopostavljenih pločica
             if (newlyPlacedCells.length === 0) {
-                setMessage('ℹ Нема новопостављених плочица за враћање.', '');
+                setMessage('ℹ Нема новопостављених плочица.', '');
                 return;
             }
-            for (const p of [...newlyPlacedCells]) {
-                myRack.push(p.letter);
-            }
+            for (const p of [...newlyPlacedCells]) myRack.push(p.letter);
             newlyPlacedCells = [];
             selectedTileIndex = null;
             renderBoardFromState(currentBoardState);
             renderMyRack();
-            setMessage('↩ Све плочице су враћене на сталак.', '');
+            setMessage('↩ Све плочице враћене на сталак.', '');
         }
 
         function shuffleRack() {
@@ -692,7 +689,7 @@
             }
             selectedTileIndex = null;
             renderMyRack();
-            setMessage('🔀 Плочице су промешане.', '');
+            setMessage('🔀 Плочице промешане.', '');
         }
 
         function submitMove() {
@@ -732,7 +729,6 @@
             document.getElementById('btnRecall').disabled = true;
             updateTurnIndicator(false);
             setMessage('🏁 ' + (msg.resultMessage || 'Игра је завршена.'), 'info');
-
             const controls = document.querySelector('.controls');
             let rematchBtn = document.getElementById('rematchBtn');
             if (!rematchBtn) {
@@ -744,15 +740,14 @@
                     sendMessage({ type: 'request_rematch' });
                     rematchBtn.disabled = true;
                     rematchBtn.textContent = '⏳ Чекам одговор...';
-                    setMessage('⏳ Захтев за реванш послат. Чекам противника...', 'info');
+                    setMessage('⏳ Захтев за реванш послат...', 'info');
                 };
                 controls.appendChild(rematchBtn);
             }
         }
+
         function showRematchRequest(msg) {
-            // Ukloni stari overlay ako postoji
             hideRematchRequest();
-            
             const overlay = document.createElement('div');
             overlay.id = 'rematchOverlay';
             overlay.className = 'overlay';
@@ -760,33 +755,26 @@
                 <div class="overlay-content">
                     <h2>🔄 Реванш?</h2>
                     <p style="margin-bottom:15px;"><strong>${msg.fromName}</strong> жели реванш!</p>
-                    <button class="btn-success" id="acceptRematchBtn" style="width:100%;padding:12px;margin-bottom:8px;">
-                        ✅ ПРИХВАТИ
-                    </button>
-                    <button class="btn-danger" id="declineRematchBtn" style="width:100%;padding:12px;">
-                        ❌ ОДБИЈ
-                    </button>
+                    <button class="btn-success" id="acceptRematchBtn" style="width:100%;padding:12px;margin-bottom:8px;">✅ ПРИХВАТИ</button>
+                    <button class="btn-danger" id="declineRematchBtn" style="width:100%;padding:12px;">❌ ОДБИЈ</button>
                 </div>
             `;
             document.body.appendChild(overlay);
-            
             document.getElementById('acceptRematchBtn').onclick = () => {
                 sendMessage({ type: 'accept_rematch', fromId: msg.fromId });
                 hideRematchRequest();
-                setMessage('🔄 Реванш прихваћен! Нова игра почиње...', 'success');
+                setMessage('🔄 Реванш прихваћен!', 'success');
             };
-            
             document.getElementById('declineRematchBtn').onclick = () => {
                 sendMessage({ type: 'decline_rematch', fromId: msg.fromId });
                 hideRematchRequest();
             };
         }
-        
+
         function hideRematchRequest() {
             const overlay = document.getElementById('rematchOverlay');
             if (overlay) overlay.remove();
         }
-        
 
         // ==================== CHAT ====================
         function sendChat() {
