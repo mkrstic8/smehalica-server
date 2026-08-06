@@ -4,6 +4,52 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Смехалица укрштеница — Online</title>
+            /* Animacije */
+        @keyframes bounceIn {
+            0% { transform: scale(0.3); opacity: 0; }
+            50% { transform: scale(1.1); }
+            70% { transform: scale(0.9); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+            20%, 40%, 60%, 80% { transform: translateX(4px); }
+        }
+        @keyframes confetti {
+            0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(-200px) rotate(720deg); opacity: 0; }
+        }
+        @keyframes glowPulse {
+            0%, 100% { box-shadow: 0 0 10px rgba(255,215,0,0.4); }
+            50% { box-shadow: 0 0 30px rgba(255,215,0,0.9); }
+        }
+        .cell.bounce { animation: bounceIn 0.4s ease; }
+        .cell.shake { animation: shake 0.5s ease; }
+        .rack-highlight { animation: glowPulse 0.8s ease-in-out 3; }
+        
+        .confetti-piece {
+            position: fixed;
+            width: 10px;
+            height: 10px;
+            z-index: 999;
+            pointer-events: none;
+            animation: confetti 2s ease-out forwards;
+        }
+        
+        .particle {
+            position: fixed;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            z-index: 998;
+            pointer-events: none;
+            animation: particleFly 1s ease-out forwards;
+        }
+        @keyframes particleFly {
+            0% { transform: translate(0, 0) scale(1); opacity: 1; }
+            100% { transform: translate(var(--dx), var(--dy)) scale(0); opacity: 0; }
+        }
     <style>
         :root { --cell-size: 34px; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -161,6 +207,102 @@
     <script>
         // ==================== KONEKCIJA ====================
         const SERVER_URL = 'wss://smehalica-server.onrender.com';
+                // ==================== ZVUCI (Web Audio API) ====================
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = null;
+        
+        function getAudioCtx() {
+            if (!audioCtx) audioCtx = new AudioCtx();
+            return audioCtx;
+        }
+        
+        function playTone(freq, duration, type = 'sine', vol = 0.1) {
+            try {
+                const ctx = getAudioCtx();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = type;
+                osc.frequency.value = freq;
+                gain.gain.value = vol;
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + duration);
+            } catch(e) {}
+        }
+        
+        function sfxPlace() {
+            playTone(600, 0.1, 'sine', 0.08);
+        }
+        
+        function sfxValid() {
+            playTone(523, 0.15, 'sine', 0.1);
+            setTimeout(() => playTone(659, 0.15, 'sine', 0.1), 150);
+            setTimeout(() => playTone(784, 0.25, 'sine', 0.12), 300);
+        }
+        
+        function sfxInvalid() {
+            playTone(200, 0.3, 'sawtooth', 0.06);
+            setTimeout(() => playTone(150, 0.3, 'sawtooth', 0.06), 200);
+        }
+        
+        function sfxWin() {
+            const notes = [523, 659, 784, 1047];
+            notes.forEach((n, i) => setTimeout(() => playTone(n, 0.3, 'sine', 0.12), i * 200));
+        }
+        
+        function sfxOpponent() {
+            playTone(400, 0.15, 'triangle', 0.05);
+            setTimeout(() => playTone(350, 0.15, 'triangle', 0.05), 150);
+        }
+                // ==================== ANIMACIJE ====================
+        function animateCell(row, col, animClass) {
+            const cell = document.querySelector(`.cell[data-row="${row}"][data-col="${col}"]`);
+            if (cell) {
+                cell.classList.add(animClass);
+                setTimeout(() => cell.classList.remove(animClass), 600);
+            }
+        }
+        
+        function spawnParticles(x, y, color, count = 10) {
+            for (let i = 0; i < count; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = x + 'px';
+                particle.style.top = y + 'px';
+                particle.style.background = color;
+                particle.style.setProperty('--dx', (Math.random() - 0.5) * 100 + 'px');
+                particle.style.setProperty('--dy', (Math.random() - 0.5) * 100 - 40 + 'px');
+                document.body.appendChild(particle);
+                setTimeout(() => particle.remove(), 1100);
+            }
+        }
+        
+        function spawnConfetti() {
+            const colors = ['#ff0','#f00','#0f0','#00f','#f0f','#0ff','#ffa500','#ff69b4'];
+            for (let i = 0; i < 30; i++) {
+                setTimeout(() => {
+                    const piece = document.createElement('div');
+                    piece.className = 'confetti-piece';
+                    piece.style.left = Math.random() * 100 + '%';
+                    piece.style.top = Math.random() * 40 + '%';
+                    piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+                    piece.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+                    piece.style.animationDuration = (1.5 + Math.random() * 2) + 's';
+                    document.body.appendChild(piece);
+                    setTimeout(() => piece.remove(), 3500);
+                }, i * 30);
+            }
+        }
+        
+        function highlightRack() {
+            const rack = document.getElementById('rack');
+            if (rack) {
+                rack.classList.add('rack-highlight');
+                setTimeout(() => rack.classList.remove('rack-highlight'), 2500);
+            }
+        }
         let ws = null;
         let playerId = null;
         let gameId = null;
@@ -230,9 +372,14 @@
                     updateGameState(msg);
                     if (msg.lastMoveWords && msg.lastMoveWords.length > 0) {
                         addChatSystemMsg(`${msg.lastMovePlayerName} игра: ${msg.lastMoveWords.join(', ')} (+${msg.lastMoveScore})`);
+                        // Animacije za protivnikov potez
+                        if (msg.currentTurn === playerId) {
+                            sfxOpponent();
+                        }
                     }
                     break;
                 case 'move_invalid':
+                    sfxInvalid();
                     alert('❌ Неважећи потез: ' + msg.error);
                     requestStateFromServer();
                     break;
@@ -240,9 +387,13 @@
                     updateGameState(msg);
                     addChatSystemMsg(`${msg.skippedByName} прескаче потез.`);
                     break;
-                case 'game_over':
+                               case 'game_over':
                     updateGameState(msg);
                     showGameOver(msg);
+                    if (msg.resultMessage && msg.resultMessage.includes('Победио')) {
+                        sfxWin();
+                        setTimeout(spawnConfetti, 500);
+                    }
                     break;
                 case 'game_state':
                     updateGameState(msg);
@@ -300,6 +451,7 @@
             document.getElementById('opponentNameLabel').textContent = '🤖 ' + msg.opponentName;
             updateGameState(msg);
             setMessage('🎮 Игра почиње! ' + (msg.isYourTurn ? 'Ти си на потезу.' : 'Противник је на потезу.'), 'info');
+            highlightRack();
         }
 
         function updateGameState(msg) {
@@ -513,6 +665,7 @@
 
             renderBoardFromState(boardState);
             renderMyRack();
+            sfxPlace();  // ← DODAJ OVDE
             setMessage(`✅ Постављено "${letter}" (${letterValues[letter] || 0} поен${letterValues[letter] === 1 ? '' : 'а'}). Настави или потврди.`, 'success');
         }
 
