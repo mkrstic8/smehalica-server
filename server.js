@@ -88,7 +88,7 @@ try {
 const games = {};        // gameId -> gameState
 const players = {};      // playerId -> { ws, gameId, playerNum, name }
 const matchmaking = [];  // igrači koji čekaju protivnika
-
+const rooms = {};  // { linkKod: { gameId, creatorId, createdAt } }
 // ==================== POMOĆNE FUNKCIJE ====================
 function createBag() {
     const bag = [];
@@ -155,7 +155,16 @@ function createGame(player1Id, player2Id) {
         turnStartTime: Date.now(),
         createdAt: Date.now()
     };
-
+    function generateRoomLink() {
+    const slova = 'АБВГДЂЕЖЗИЈКЛЉМНЊОПРСТЋУФХЦЧЏШ';
+    let link = '';
+    for (let i = 0; i < 5; i++) {
+        link += slova[Math.floor(Math.random() * slova.length)];
+    }
+    // Proveri da nije duplikat
+    if (rooms[link]) return generateRoomLink();
+    return link;
+}
     games[gameId] = game;
 
     // Poveži igrače sa igrom
@@ -521,8 +530,20 @@ function handleMessage(playerId, message) {
             }
             break;
 
-        case 'find_game':
+        case 'create_room':
+            handleCreateRoom(playerId);
+            break;
+
+        case 'join_room':
+            handleJoinRoom(playerId, message.roomLink);
+            break;
+
+        case 'quick_match':
             handleFindGame(playerId);
+            break;
+
+        case 'get_room_link':
+            handleGetRoomLink(playerId);
             break;
 
         case 'cancel_find':
@@ -548,15 +569,19 @@ function handleMessage(playerId, message) {
         case 'chat':
             handleChat(playerId, message.text);
             break;
+
         case 'ping':
             sendToPlayer(playerId, { type: 'pong' });
             break;
-                case 'request_rematch':
+
+        case 'request_rematch':
             handleRematchRequest(playerId);
             break;
+
         case 'accept_rematch':
             handleAcceptRematch(playerId, message.fromId);
             break;
+
         case 'decline_rematch':
             handleDeclineRematch(playerId, message.fromId);
             break;
@@ -568,7 +593,94 @@ function handleMessage(playerId, message) {
             });
     }
 }
+function handleCreateRoom(playerId) {
+    const player = players[playerId];
+    if (!player) return;
+    if (player.gameId) {
+        sendToPlayer(playerId, { type: 'error', message: 'Већ си у игри.' });
+        return;
+    }
+    
+    const link = generateRoomLink();
+    // Kreiraj praznu sobu (igra još nije aktivna)
+    rooms[link] = {
+        creatorId: playerId,
+        createdAt: Date.now()
+    };
+    
+    sendToPlayer(playerId, {
+        type: 'room_created',
+        roomLink: link,
+        message: `Соба креирана! Пошаљи линк противнику: ${link}`
+    });
+    
+    console.log(`🏠 Soba kreirana: ${link} od strane ${player.name}`);
+}
 
+function handleJoinRoom(playerId, roomLink) {
+    const player = players[playerId];
+    if (!player) return;
+    if (player.gameId) {
+        sendToPlayer(playerId, { type: 'error', message: 'Већ си у игри.' });
+        return;
+    }
+    
+    if (!roomLink || !rooms[roomLink]) {
+        sendToPlayer(playerId, { type: 'error', message: 'Соба не постоји или је линк неважећи.' });
+        return;
+    }
+    
+    const room = rooms[roomLink];
+    const creatorId = room.creatorId;
+    
+    if (!players[creatorId] || players[creatorId].gameId) {
+        delete rooms[roomLink];
+        sendToPlayer(playerId, { type: 'error', message: 'Креатор собе више није доступан.' });
+        return;
+    }
+    
+    // Kreiraj igru
+    const game = createGame(creatorId, playerId);
+    
+    // Obavesti oba igrača
+    const state1 = getGameState(game, creatorId);
+    state1.type = 'game_start';
+    state1.opponentName = player.name;
+    state1.yourPlayerNum = 1;
+    sendToPlayer(creatorId, state1);
+    
+    const state2 = getGameState(game, playerId);
+    state2.type = 'game_start';
+    state2.opponentName = players[creatorId].name;
+    state2.yourPlayerNum = 2;
+    sendToPlayer(playerId, state2);
+    
+    // Obriši sobu
+    delete rooms[roomLink];
+    
+    console.log(`🎮 Igra ${game.id}: ${players[creatorId].name} vs ${player.name} (soba: ${roomLink})`);
+}
+
+function handleGetRoomLink(playerId) {
+    const player = players[playerId];
+    if (!player || !player.gameId) {
+        sendToPlayer(playerId, { type: 'error', message: 'Ниси у игри.' });
+        return;
+    }
+    
+    const game = games[player.gameId];
+    if (!game) return;
+    
+    // Generiši link za postojeću igru (za deljenje)
+    const link = generateRoomLink();
+    rooms[link] = { creatorId: playerId, gameId: player.gameId, createdAt: Date.now() };
+    
+    sendToPlayer(playerId, {
+        type: 'room_link',
+        roomLink: link,
+        message: `Линк за дељење: ${link}`
+    });
+}
 function handleFindGame(playerId) {
     const player = players[playerId];
     if (!player) return;
