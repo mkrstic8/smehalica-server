@@ -553,10 +553,10 @@ function handleMessage(playerId, message) {
             handleRematchRequest(playerId);
             break;
         case 'accept_rematch':
-            handleAcceptRematch(playerId, msg.fromId);
+            handleAcceptRematch(playerId, message.fromId);
             break;
         case 'decline_rematch':
-            handleDeclineRematch(playerId, msg.fromId);
+            handleDeclineRematch(playerId, message.fromId);
             break;
 
         default:
