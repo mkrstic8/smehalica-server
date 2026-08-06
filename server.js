@@ -356,9 +356,11 @@ function validateMove(game, playerId, placements) {
     // Proveri rečnik
     const invalidWords = [];
     for (const w of allWords) {
+        // Preskoči reči od 1 slova — one nisu prave reči, samo spojnice
         if (w.word.length < 2) {
-            invalidWords.push(`"${w.word}" (прекратко)`);
-        } else if (!DICTIONARY.has(w.word.toUpperCase())) {
+            continue;  // ← ignoriši, nije greška!
+        }
+        if (!DICTIONARY.has(w.word.toUpperCase())) {
             invalidWords.push(`"${w.word}" (није у речнику)`);
         }
     }
