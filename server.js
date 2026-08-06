@@ -126,7 +126,16 @@ function createEmptyBoard() {
     }
     return board;
 }
-
+function generateRoomLink() {
+    const slova = 'АБВГДЂЕЖЗИЈКЛЉМНЊОПРСТЋУФХЦЧЏШ';
+    let link = '';
+    for (let i = 0; i < 5; i++) {
+        link += slova[Math.floor(Math.random() * slova.length)];
+    }
+    // Proveri da nije duplikat
+    if (rooms[link]) return generateRoomLink();
+    return link;
+}
 function createGame(player1Id, player2Id) {
     const gameId = uuidv4().substring(0, 8).toUpperCase();
     const bag = createBag();
@@ -155,16 +164,7 @@ function createGame(player1Id, player2Id) {
         turnStartTime: Date.now(),
         createdAt: Date.now()
     };
-    function generateRoomLink() {
-    const slova = 'АБВГДЂЕЖЗИЈКЛЉМНЊОПРСТЋУФХЦЧЏШ';
-    let link = '';
-    for (let i = 0; i < 5; i++) {
-        link += slova[Math.floor(Math.random() * slova.length)];
-    }
-    // Proveri da nije duplikat
-    if (rooms[link]) return generateRoomLink();
-    return link;
-}
+
     games[gameId] = game;
 
     // Poveži igrače sa igrom
@@ -471,12 +471,16 @@ wss.on('connection', (ws) => {
         message: 'Повезан/а на сервер Смехалице!'
     });
 
-    ws.on('message', (data) => {
+        ws.on('message', (data) => {
         try {
-            const message = JSON.parse(data.toString());
+            const raw = data.toString();
+            console.log('📨 Primljena poruka:', raw.substring(0, 200)); // Loguj prvih 200 karaktera
+            const message = JSON.parse(raw);
+            console.log('✅ Parsiran tip:', message.type);
             handleMessage(playerId, message);
         } catch (e) {
-            console.error('❌ Greška u parsiranju poruke:', e);
+            console.error('❌ Greška u parsiranju:', e.message);
+            console.error('📄 Sirovi podaci:', data.toString().substring(0, 200));
             send(ws, { type: 'error', message: 'Неважећи формат поруке.' });
         }
     });
@@ -522,11 +526,8 @@ function handleMessage(playerId, message) {
     switch (type) {
         case 'set_name':
             if (players[playerId]) {
-                players[playerId].name = message.name || 'Играч';
-                sendToPlayer(playerId, {
-                    type: 'name_set',
-                    name: players[playerId].name
-                });
+                players[playerId].name = message.name || 'Igrac';
+                sendToPlayer(playerId, { type: 'name_set', name: players[playerId].name });
             }
             break;
 
@@ -540,10 +541,6 @@ function handleMessage(playerId, message) {
 
         case 'quick_match':
             handleFindGame(playerId);
-            break;
-
-        case 'get_room_link':
-            handleGetRoomLink(playerId);
             break;
 
         case 'cancel_find':
@@ -587,10 +584,8 @@ function handleMessage(playerId, message) {
             break;
 
         default:
-            sendToPlayer(playerId, {
-                type: 'error',
-                message: `Непознат тип поруке: ${type}`
-            });
+            console.log('Nepoznat tip poruke:', type);
+            sendToPlayer(playerId, { type: 'error', message: 'Nepoznat tip poruke: ' + type });
     }
 }
 function handleCreateRoom(playerId) {

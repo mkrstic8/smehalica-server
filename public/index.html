@@ -500,7 +500,11 @@
 
         function sendMessage(msg) {
             if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify(msg));
+                const json = JSON.stringify(msg);
+                console.log('📤 Šaljem:', json.substring(0, 200));
+                ws.send(json);
+            } else {
+                console.warn('⚠️ WebSocket nije otvoren. Status:', ws ? ws.readyState : 'nema ws');
             }
         }
 
