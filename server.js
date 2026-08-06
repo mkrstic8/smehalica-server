@@ -95,6 +95,11 @@ function createBag() {
     for (const [letter, count] of tileDistribution) {
         for (let i = 0; i < count; i++) bag.push(letter);
     }
+    
+    // FIX #3: Dodaj još samoglasnika (duplo) za lakše formiranje reči
+    const extraVowels = ['А','А','А','А','Е','Е','Е','Е','И','И','И','О','О','О','У','У'];
+    bag.push(...extraVowels);
+    
     // Fisher-Yates shuffle
     for (let i = bag.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -541,13 +546,17 @@ function handleMessage(playerId, message) {
         case 'chat':
             handleChat(playerId, message.text);
             break;
-
-        case 'rematch':
-            handleRematch(playerId);
-            break;
-
         case 'ping':
             sendToPlayer(playerId, { type: 'pong' });
+            break;
+                case 'request_rematch':
+            handleRematchRequest(playerId);
+            break;
+        case 'accept_rematch':
+            handleAcceptRematch(playerId, msg.fromId);
+            break;
+        case 'decline_rematch':
+            handleDeclineRematch(playerId, msg.fromId);
             break;
 
         default:
@@ -816,31 +825,94 @@ function handleChat(playerId, text) {
     });
 }
 
-function handleRematch(playerId) {
+function handleRematchRequest(playerId) {
     const player = players[playerId];
     if (!player || !player.gameId) return;
-
     const game = games[player.gameId];
     if (!game || game.status !== 'finished') return;
-
+    
     const opponentId = Object.keys(game.players).find(id => id !== playerId);
+    if (!opponentId || !players[opponentId]) return;
+    
+    // Pošalji zahtev protivniku
+    sendToPlayer(opponentId, {
+        type: 'rematch_request',
+        fromId: playerId,
+        fromName: player.name,
+        message: `${player.name} жели реванш!`
+    });
+    
+    sendToPlayer(playerId, {
+        type: 'rematch_sent',
+        message: 'Захтев за реванш је послат.'
+    });
+    
+    console.log(`🔄 ${player.name} traži revanš od ${players[opponentId].name}`);
+}
 
-    // Iniciraj rematch — kreiraj novu igru sa istim igračima
-    const newGame = createGame(playerId, opponentId);
-
-    for (const pid of [playerId, opponentId]) {
-        const state = getGameState(newGame, pid);
-        state.type = 'game_start';
-        state.opponentName = players[pid === playerId ? opponentId : playerId].name;
-        state.yourPlayerNum = pid === playerId ? 1 : 2;
-        state.isRematch = true;
-        sendToPlayer(pid, state);
+function handleAcceptRematch(playerId, fromId) {
+    const player = players[playerId];
+    if (!player) return;
+    
+    const opponent = players[fromId];
+    if (!opponent || !opponent.gameId) {
+        sendToPlayer(playerId, { type: 'error', message: 'Противник више није доступан.' });
+        return;
     }
+    
+    const oldGame = games[opponent.gameId];
+    if (!oldGame || oldGame.status !== 'finished') return;
+    
+    // Kreiraj novu igru
+    const newGame = createGame(fromId, playerId);
+    const gameState1 = getGameState(newGame, fromId);
+    const gameState2 = getGameState(newGame, playerId);
+    
+    sendToPlayer(fromId, {
+        ...gameState1,
+        type: 'game_start',
+        opponentName: player.name,
+        yourPlayerNum: 1,
+        isRematch: true
+    });
+    
+    sendToPlayer(playerId, {
+        ...gameState2,
+        type: 'rematch_accepted',
+        opponentName: opponent.name,
+        yourPlayerNum: 2
+    });
+    
+    // Odmah pošalji i game_start
+    setTimeout(() => {
+        sendToPlayer(playerId, {
+            ...gameState2,
+            type: 'game_start',
+            opponentName: opponent.name,
+            yourPlayerNum: 2,
+            isRematch: true
+        });
+    }, 200);
+    
+    delete games[oldGame.id];
+    console.log(`🔄 Revanš prihvaćen: ${newGame.id}`);
+}
 
-    // Očisti staru igru
-    delete games[game.id];
-
-    console.log(`🔄 Rematch: ${newGame.id}`);
+function handleDeclineRematch(playerId, fromId) {
+    const opponent = players[fromId];
+    if (!opponent) return;
+    
+    sendToPlayer(fromId, {
+        type: 'rematch_declined',
+        message: `${players[playerId].name} је одбио реванш.`
+    });
+    
+    sendToPlayer(playerId, {
+        type: 'rematch_declined',
+        message: 'Одбио/ла си реванш.'
+    });
+    
+    console.log(`❌ ${players[playerId].name} odbija revanš`);
 }
 
 function handleDisconnect(playerId) {
