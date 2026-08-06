@@ -138,17 +138,72 @@
         <span class="connection-dot disconnected"></span> Повезивање...
     </p>
 
-    <div class="overlay" id="nameOverlay">
-        <div class="overlay-content">
+        <div class="overlay" id="nameOverlay">
+        <div class="overlay-content" id="nameScreen">
             <h2>🎯 Смехалица</h2>
             <p style="margin-bottom:10px;">Унеси своје име:</p>
             <input type="text" id="nameInput" placeholder="Твоје име" maxlength="20" value="Играч">
             <br>
-            <button class="btn-primary" onclick="startFinding()" style="width:100%;padding:12px;">
-                🎮 ПРОНАЂИ ПРОТИВНИКА
+            <button class="btn-primary" onclick="showGameOptions()" style="width:100%;padding:12px;">
+                ▶ НАСТАВИ
             </button>
-            <div class="status" id="findingStatus"></div>
-            <button class="btn-danger" id="cancelFindBtn" onclick="cancelFind()" style="display:none;width:100%;margin-top:8px;">
+        </div>
+        
+        <div class="overlay-content" id="optionsScreen" style="display:none;">
+            <h2>🎯 Изабери начин игре</h2>
+            <button class="btn-success" onclick="quickMatch()" style="width:100%;padding:12px;margin-bottom:8px;">
+                ⚡ БРЗА ИГРА
+            </button>
+            <button class="btn-primary" onclick="showCreateRoom()" style="width:100%;padding:12px;margin-bottom:8px;">
+                🏠 НАПРАВИ СОБУ
+            </button>
+            <button class="btn-info" onclick="showJoinRoom()" style="width:100%;padding:12px;margin-bottom:8px;">
+                🔗 ПРИДРУЖИ СЕ СОБИ
+            </button>
+            <button class="btn-secondary" onclick="goBackToName()" style="width:100%;padding:12px;">
+                ↩ НАЗАД
+            </button>
+        </div>
+        
+        <div class="overlay-content" id="createRoomScreen" style="display:none;">
+            <h2>🏠 Нова соба</h2>
+            <p id="roomLinkDisplay" style="font-size:1.5rem;color:#FFD700;letter-spacing:3px;margin:15px 0;">----</p>
+            <p style="font-size:0.8rem;">Пошаљи овај линк противнику</p>
+            <button class="btn-primary" id="copyLinkBtn" onclick="copyRoomLink()" style="width:100%;padding:12px;margin-bottom:8px;">
+                📋 КОПИРАЈ ЛИНК
+            </button>
+            <div class="status" id="roomStatus">Чекам противника да се придружи...</div>
+            <button class="btn-danger" id="cancelRoomBtn" onclick="cancelRoom()" style="width:100%;padding:12px;margin-top:8px;">
+                ❌ ОТКАЖИ
+            </button>
+        </div>
+        
+        <div class="overlay-content" id="joinRoomScreen" style="display:none;">
+            <h2>🔗 Придружи се соби</h2>
+            <p style="margin-bottom:10px;">Унеси линк собе (5 слова):</p>
+            <input type="text" id="roomLinkInput" placeholder="нпр. АБВГД" maxlength="5" style="text-transform:uppercase;font-size:1.3rem;letter-spacing:5px;text-align:center;">
+            <br>
+            <button class="btn-info" onclick="joinRoom()" style="width:100%;padding:12px;margin-bottom:8px;">
+                🔗 ПРИДРУЖИ СЕ
+            </button>
+            <div class="status" id="joinStatus"></div>
+            <button class="btn-secondary" onclick="goBackToOptions()" style="width:100%;padding:12px;">
+                ↩ НАЗАД
+            </button>
+        </div>
+        
+        <div class="overlay-content" id="findingScreen" style="display:none;">
+            <h2>⚡ Брза игра</h2>
+            <div class="status" id="findingStatus">Тражим противника...</div>
+            <!-- Mešanje dok čeka -->
+            <div class="rack-container" style="margin-top:15px;">
+                <span class="rack-label">🎴 Вежбај:</span>
+                <div class="rack" id="waitingRack"></div>
+            </div>
+            <button class="btn-secondary" onclick="shuffleWaitingRack()" style="width:100%;padding:10px;margin-top:8px;">
+                🔀 ПРОМЕШАЈ
+            </button>
+            <button class="btn-danger" id="cancelFindBtn" onclick="cancelFind()" style="width:100%;padding:12px;margin-top:8px;">
                 ❌ ОТКАЖИ
             </button>
         </div>
@@ -324,7 +379,101 @@
             'П':2,'Р':1,'С':1,'Т':1,'Ћ':10,'У':1,'Ф':5,'Х':4,'Ц':4,
             'Ч':4,'Џ':8,'Ш':4
         };
+        let waitingRack = [];
+        let myRoomLink = null;
 
+        function showGameOptions() {
+            myName = document.getElementById('nameInput').value.trim() || 'Играч';
+            sendMessage({ type: 'set_name', name: myName });
+            document.getElementById('nameScreen').style.display = 'none';
+            document.getElementById('optionsScreen').style.display = 'block';
+        }
+        
+        function goBackToName() {
+            document.getElementById('optionsScreen').style.display = 'none';
+            document.getElementById('nameScreen').style.display = 'block';
+        }
+        
+        function goBackToOptions() {
+            document.getElementById('joinRoomScreen').style.display = 'none';
+            document.getElementById('createRoomScreen').style.display = 'none';
+            document.getElementById('optionsScreen').style.display = 'block';
+        }
+        
+        function quickMatch() {
+            document.getElementById('optionsScreen').style.display = 'none';
+            document.getElementById('findingScreen').style.display = 'block';
+            // Generiši nasumične pločice za vežbanje
+            waitingRack = [];
+            const allLetters = 'АБВГДЂЕЖЗИЈКЛЉМНЊОПРСТЋУФХЦЧЏШ';
+            for (let i = 0; i < 7; i++) {
+                waitingRack.push(allLetters[Math.floor(Math.random() * allLetters.length)]);
+            }
+            renderWaitingRack();
+            sendMessage({ type: 'quick_match' });
+        }
+        
+        function showCreateRoom() {
+            document.getElementById('optionsScreen').style.display = 'none';
+            document.getElementById('createRoomScreen').style.display = 'block';
+            document.getElementById('roomStatus').textContent = 'Креирам собу...';
+            sendMessage({ type: 'create_room' });
+        }
+        
+        function showJoinRoom() {
+            document.getElementById('optionsScreen').style.display = 'none';
+            document.getElementById('joinRoomScreen').style.display = 'block';
+            document.getElementById('roomLinkInput').value = '';
+            document.getElementById('joinStatus').textContent = '';
+        }
+        
+        function joinRoom() {
+            const link = document.getElementById('roomLinkInput').value.trim().toUpperCase();
+            if (link.length !== 5) {
+                document.getElementById('joinStatus').textContent = 'Линк мора имати 5 слова!';
+                return;
+            }
+            document.getElementById('joinStatus').textContent = 'Придруживање...';
+            sendMessage({ type: 'join_room', roomLink: link });
+        }
+        
+        function copyRoomLink() {
+            if (myRoomLink) {
+                navigator.clipboard.writeText(myRoomLink).then(() => {
+                    document.getElementById('roomStatus').textContent = 'Линк копиран! ✓';
+                }).catch(() => {
+                    document.getElementById('roomStatus').textContent = 'Линк: ' + myRoomLink;
+                });
+            }
+        }
+        
+        function cancelRoom() {
+            sendMessage({ type: 'cancel_find' });
+            document.getElementById('createRoomScreen').style.display = 'none';
+            document.getElementById('optionsScreen').style.display = 'block';
+            myRoomLink = null;
+        }
+        
+        function renderWaitingRack() {
+            const rackEl = document.getElementById('waitingRack');
+            if (!rackEl) return;
+            rackEl.innerHTML = '';
+            waitingRack.forEach(letter => {
+                const tile = document.createElement('div');
+                tile.className = 'tile';
+                tile.textContent = letter;
+                tile.style.cursor = 'default';
+                rackEl.appendChild(tile);
+            });
+        }
+        
+        function shuffleWaitingRack() {
+            for (let i = waitingRack.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [waitingRack[i], waitingRack[j]] = [waitingRack[j], waitingRack[i]];
+            }
+            renderWaitingRack();
+        }
         // ==================== WEBSOCKET ====================
         function connect() {
             ws = new WebSocket(SERVER_URL);
@@ -342,10 +491,11 @@
             ws.onclose = () => {
                 console.log('🔌 Veza prekinuta');
                 document.getElementById('connectionStatus').innerHTML =
-                    '<span class="connection-dot disconnected"></span> Прекинуто — osveži stranicu';
+                    '<span class="connection-dot disconnected"></span> Прекинуто — покушавам поново...';
                 gameActive = false;
+                // Pokušaj reconnect posle 3 sekunde
+                setTimeout(connect, 3000);
             };
-            ws.onerror = (err) => { console.error('WebSocket greška:', err); };
         }
 
         function sendMessage(msg) {
@@ -359,6 +509,8 @@
             switch (msg.type) {
                 case 'connected':
                     playerId = msg.playerId;
+                    // Sačuvaj ID u localStorage
+                    localStorage.setItem('smehalica_playerId', playerId);
                     setInterval(() => sendMessage({ type: 'ping' }), 30000);
                     break;
                 case 'finding_game':
@@ -437,6 +589,15 @@
                     addChatSystemMsg('❌ Реванш одбијен.');
                     setMessage('❌ Противник је одбио реванш.', 'info');
                     break;
+                                    case 'room_created':
+                    myRoomLink = msg.roomLink;
+                    document.getElementById('roomLinkDisplay').textContent = msg.roomLink;
+                    document.getElementById('roomStatus').textContent = msg.message;
+                    document.getElementById('copyLinkBtn').style.display = 'block';
+                    break;
+                case 'room_link':
+                    myRoomLink = msg.roomLink;
+                    break;
             }
         }
 
@@ -445,19 +606,16 @@
         }
 
         // ==================== UI ====================
-        function startFinding() {
-            myName = document.getElementById('nameInput').value.trim() || 'Играч';
-            sendMessage({ type: 'set_name', name: myName });
-            sendMessage({ type: 'find_game' });
-            document.getElementById('cancelFindBtn').style.display = 'block';
-            document.getElementById('findingStatus').textContent = 'Тражим противника...';
-            document.getElementById('nameInput').disabled = true;
+         function startFinding() {
+            // Više se ne koristi direktno
+            quickMatch();
         }
 
         function cancelFind() {
             sendMessage({ type: 'cancel_find' });
-            document.getElementById('cancelFindBtn').style.display = 'none';
-            document.getElementById('nameInput').disabled = false;
+            document.getElementById('findingScreen').style.display = 'none';
+            document.getElementById('optionsScreen').style.display = 'block';
+            waitingRack = [];
         }
 
         function startGame(msg) {
@@ -782,7 +940,6 @@
             const text = input.value.trim();
             if (!text) return;
             sendMessage({ type: 'chat', text: text });
-            addChatMessage('Ти', text);
             input.value = '';
         }
 
