@@ -76,24 +76,7 @@
         .cell.tw::after{content:'3Р'}.cell.dw::after{content:'2Р'}.cell.tl::after{content:'3С'}.cell.dl::after{content:'2С'}.cell.star::after{content:'★';font-size:0.8rem}
         .cell.occupied.tw::after,.cell.occupied.dw::after,.cell.occupied.tl::after,.cell.occupied.dl::after,.cell.occupied.star::after{content:''}
         
-        /* ZADNJA REČ - HIGHLIGHT */
-        .cell.last-move { 
-            background: #ff3d00 !important; 
-            color: white !important;
-            font-weight: 900 !important;
-            box-shadow: 0 0 12px rgba(255,61,0,0.9), inset 0 0 8px rgba(255,255,255,0.3);
-            z-index: 2;
-            transform: scale(1.05);
-        }
-        .cell.last-move::after {
-            content: '';
-            position: absolute;
-            top: -2px; left: -2px; right: -2px; bottom: -2px;
-            border: 2px solid #fff;
-            border-radius: 3px;
-            pointer-events: none;
-            z-index: 3;
-        }
+
         
         /* POENI NA TABLI */
         .cell-point {
@@ -767,11 +750,7 @@
                     if (boardState[r] && boardState[r][c]) {
                         cell.textContent = boardState[r][c].letter;
                         cell.classList.add('occupied');
-                        
-                        // Proveri da li je ovo deo zadnje reči
-                        if (lastMoveCells && lastMoveCells.some(p => p.row === r && p.col === c)) {
-                            cell.classList.add('last-move');
-                        }
+
                         
                         // Dodaj poene
                         const pointSpan = document.createElement('span');
