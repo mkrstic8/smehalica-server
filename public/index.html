@@ -87,7 +87,23 @@
         .tile { width: 38px; height: 38px; background: linear-gradient(180deg,#fff9e6 0%,#f0d9a0 50%,#c89840 100%); border: 2px solid #7a5810; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: bold; cursor: pointer; box-shadow: 0 3px 5px rgba(0,0,0,0.3); transition: all 0.2s; position: relative; }
         .tile:active { transform: scale(0.85); }
         .tile.selected { border: 3px solid #FFD700; box-shadow: 0 0 15px rgba(255,215,0,0.8); transform: translateY(-6px); }
-        .tile-point { font-size: 0.55rem; color: #ffe0b2; font-weight: bold; text-align: center; min-height: 12px; }
+        .tile-point {
+        position: absolute;
+        bottom: -3px;
+        right: -3px;
+        font-size: 0.5rem;
+        font-weight: bold;
+        color: #fff;
+        background: rgba(0,0,0,0.7);
+        border-radius: 50%;
+        width: 16px;
+        height: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+        z-index: 2;
+                    }
         .score-display { display: flex; gap: 10px; font-size: 0.9rem; font-weight: bold; flex-wrap: wrap; justify-content: center; }
         .score-item { background: rgba(0,0,0,0.35); padding: 6px 12px; border-radius: 8px; text-align: center; min-width: 60px; }
         .score-item.active-player { border: 2px solid #FFD700; box-shadow: 0 0 10px rgba(255,215,0,0.5); }
@@ -128,6 +144,40 @@
             .tile{width:32px;height:32px;font-size:1rem}
             button{padding:6px 10px;font-size:0.7rem}
             .cell{font-size:0.65rem}
+        }
+                /* Poeni na pločici na tabli */
+        .cell.occupied {
+            position: relative;
+        }
+        .cell-point {
+            position: absolute;
+            bottom: 1px;
+            right: 2px;
+            font-size: 0.5rem;
+            font-weight: bold;
+            color: rgba(0,0,0,0.6);
+            line-height: 1;
+            pointer-events: none;
+        }
+        /* Poeni u ruci — već postojeći tile-point ostaje, samo ga pozicioniramo */
+        .tile-wrapper {
+            position: relative;
+        }
+        .tile-point {
+            position: absolute;
+            bottom: -2px;
+            right: -2px;
+            font-size: 0.5rem;
+            font-weight: bold;
+            color: #fff;
+            background: rgba(0,0,0,0.6);
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
         }
     </style>
 </head>
@@ -704,6 +754,11 @@
                         if (lastMoveCells.some(p => p.row === r && p.col === c)) {
                             cell.classList.add('last-move');
                         }
+                        // Dodaj poene u donjem desnom uglu
+                        const pointSpan = document.createElement('span');
+                        pointSpan.className = 'cell-point';
+                        pointSpan.textContent = letterValues[boardState[r][c].letter] || 0;
+                        cell.appendChild(pointSpan);
                     }
 
                     cell.dataset.row = r;
@@ -717,6 +772,14 @@
                 if (cell) {
                     cell.textContent = p.letter;
                     cell.classList.add('occupied', 'newly-placed');
+                    // Dodaj poene
+                    let pointSpan = cell.querySelector('.cell-point');
+                    if (!pointSpan) {
+                        pointSpan = document.createElement('span');
+                        pointSpan.className = 'cell-point';
+                        cell.appendChild(pointSpan);
+                    }
+                    pointSpan.textContent = letterValues[p.letter] || 0;
                 }
             }
         }
@@ -738,6 +801,7 @@
                 const points = document.createElement('div');
                 points.className = 'tile-point';
                 points.textContent = letterValues[letter] || 0;
+
                 wrapper.appendChild(tile);
                 wrapper.appendChild(points);
                 rackEl.appendChild(wrapper);
