@@ -43,46 +43,48 @@ const tileDistribution = [
 
 // ==================== REČNIK ====================
 // Učitaj reči iz fajla (ili koristi ugrađeni demo set)
+// ==================== REČNIK ====================
 let DICTIONARY = new Set();
-
 
 try {
     const dictFile = fs.readFileSync('./serbian-words.txt', 'utf8');
     const words = dictFile.split(/[\n\r]+/)
         .map(w => w.trim().toUpperCase())
         .filter(w => /^[АБВГДЂЕЖЗИЈКЛЉМНЊОПРСТЋУФХЦЧЏШ]+$/.test(w))
-        .filter(w => w.length >= 2 && w.length <= 15);
+        .filter(w => w.length >= 3 && w.length <= 15); // SAMO 3+ slova iz fajla
     DICTIONARY = new Set(words);
-    console.log(`📚 Rečnik učitan: ${DICTIONARY.size} reči`);
+    console.log(`📚 Rečnik učitan iz fajla: ${DICTIONARY.size} reči (3+ slova)`);
 } catch (e) {
-    console.log('⚠️  Fajl rečnika nije pronađen. Koristim demo rečnik.');
-    // Demo rečnik
-    const demoWords = [
-        'АЛА','АЛАТ','БАР','БОРА','БРАТ','БРДО','ВАТРА','ВЕК','ВЕРА','ВЕТАР',
-        'ВИНО','ВОДА','ГЛАВА','ГОРА','ГОСТ','ГРАД','ГРОБ','ДА','ДАН','ДАР',
-        'ДВА','ДВОР','ДЕДА','ДЕЛО','ДОМ','ДРВО','ДУГ','ЖАБА','ЖАР','ЖЕНА',
-        'ЖИВОТ','ЖУТ','ЗА','ЗВЕР','ЗВОНО','ЗЕМЉА','ЗИД','ЗИМА','ЗЛАТО',
-        'ЗМИЈА','ЗНАК','И','ИВИЦА','ИГЛА','ИГРА','ИМЕ','ЈА','ЈЕ','ЈЕДАН',
-        'ЈЕЗЕРО','ЈЕЛЕН','ЈУГ','ЈУТРО','КА','КАД','КАКО','КАМЕН','КИША',
-        'КЊИГА','КО','КОД','КОРАК','КОСТ','КОЊ','КРАЈ','КРВ','КРИЛО',
-        'КРОЗ','КРУГ','КУЋА','ЛАВ','ЛАК','ЛЕД','ЛЕП','ЛЕТО','ЛИСТ','ЛИЦЕ',
-        'ЛОВ','МАГЛА','МАЛИ','МАЧ','МЕД','МЕСЕЦ','МИ','МИР','МЛЕКО',
-        'МНОГО','МОЈ','МОРЕ','МОСТ','МРАК','МУЖ','МУКА','НА','НАД',
-        'НАРОД','НЕ','НЕБО','НИ','НОВ','НОГА','НОЋ','НОС','ЊЕН','ЊИХ',
-        'О','ОБА','ОБЛАК','ОБРАЗ','ОВАЈ','ОД','ОКО','ОН','ОНА','ОПЕТ',
-        'ОТАЦ','ОЧИ','ПАД','ПАС','ПЕТ','ПИВО','ПИСМО','ПО','ПОД','ПОЉЕ',
-        'ПОСАО','ПРАВ','ПРЕ','ПРИЧА','ПРОЗОР','ПТИЦА','ПУТ','РАД','РАДОСТ',
-        'РАК','РАНА','РАТ','РЕД','РЕКА','РЕЧ','РИБА','РОД','РУЖА','РУКА',
-        'С','СА','САД','САМ','САН','САТ','СВЕТ','СВОЈ','СЕ','СЕЛО','СИЛА',
-        'СЛОВО','СМЕХ','СНЕГ','СО','СОБА','СРЦЕ','СТВАР','СТО','СУНЦЕ',
-        'ТА','ТАЈ','ТАМА','ТВОЈ','ТЕ','ТЕЛО','ТИ','ТО','ТРАГ','ТРИ',
-        'ТУГА','ЋЕ','ЋЕРКА','У','УВО','УЛИЦА','УМ','УХО','ХВАЛА','ХЛАД',
-        'ХЛЕБ','ХРАНА','ХРАСТ','ЦАР','ЦВЕТ','ЦЕНА','ЦРН','ЧАЈ','ЧАС',
-        'ЧЕТИРИ','ЧОВЕК','ЧУДО','ЏАК','ШАЛА','ШКОЛА','ШТА','ШУМА'
-    ];
-    DICTIONARY = new Set(demoWords);
-    console.log(`📚 Demo rečnik: ${DICTIONARY.size} reči`);
+    console.error('❌ Ne mogu da učitam serbian-words.txt:', e.message);
+    process.exit(1);
 }
+
+// Dodaj dozvoljene dvoslovne reči
+const allowedTwoLetterWords = [
+    'АД','АХ','АЈ','АЛ','АС','АТ','АУ',
+    'БА','БЕ','БИ',
+    'ДА','ДЕ','ДО',
+    'ЕХ','ЕЈ',
+    'ЈА','ЈЕ',
+    'КА','КО',
+    'МА','МЕ','МИ','МУ',
+    'НА','НЕ','НИ','НО',
+    'ОД','ОН','ОТ',
+    'ПА','ПО',
+    'СА','СЕ','СИ','СО','СУ',
+    'ТА','ТЕ','ТИ','ТО','ТУ',
+    'УЗ','УФ',
+    'ХА','ХЕ','ХИ','ХО',
+    'ЋЕ','ЋИ','ЋУ',
+    'ШУ'
+];
+
+for (const w of allowedTwoLetterWords) {
+    DICTIONARY.add(w);
+}
+
+console.log(`📚 Dodato ${allowedTwoLetterWords.length} dvoslovnih reči`);
+console.log(`📚 Ukupno reči u rečniku: ${DICTIONARY.size}`);
 
 // ==================== STANJE IGARA ====================
 const games = {};        // gameId -> gameState
@@ -329,50 +331,66 @@ function validateMove(game, playerId, placements) {
     // Sakupljanje svih formiranih reči
     const allWords = [{ word: mainWord, cells: mainCells }];
 
-    // Unakrsne reči
-    for (const p of tempBoard) {
-        if (isHorizontal) {
-            let sr = p.row;
-            while (sr > 0 && board[sr - 1][p.col]) sr--;
-            let er = p.row;
-            while (er < BOARD_SIZE - 1 && board[er + 1][p.col]) er++;
-            if (er > sr) {
-                let cw = '';
-                const cells = [];
-                for (let r = sr; r <= er; r++) {
-                    cw += board[r][p.col].letter;
-                    cells.push({ row: r, col: p.col });
-                }
-                if (cw !== mainWord) allWords.push({ word: cw, cells });
-            }
-        } else {
-            let sc = p.col;
-            while (sc > 0 && board[p.row][sc - 1]) sc--;
-            let ec = p.col;
-            while (ec < BOARD_SIZE - 1 && board[p.row][ec + 1]) ec++;
-            if (ec > sc) {
-                let cw = '';
-                const cells = [];
-                for (let c = sc; c <= ec; c++) {
-                    cw += board[p.row][c].letter;
-                    cells.push({ row: p.row, col: c });
-                }
-                if (cw !== mainWord) allWords.push({ word: cw, cells });
-            }
-        }
-    }
+// Sakupljanje svih formiranih reči
+const allWords = [];
 
-    // Proveri rečnik
-    const invalidWords = [];
-    for (const w of allWords) {
-        // Preskoči reči od 1 slova — one nisu prave reči, samo spojnice
-        if (w.word.length < 2) {
-            continue;  // ← ignoriši, nije greška!
+// DODAJ GLAVNU REČ SAMO AKO IMA 2+ SLOVA
+if (mainWord.length >= 2) {
+    allWords.push({ word: mainWord, cells: mainCells });
+}
+
+// Unakrsne reči
+for (const p of tempBoard) {
+    if (isHorizontal) {
+        let sr = p.row;
+        while (sr > 0 && board[sr - 1][p.col]) sr--;
+        let er = p.row;
+        while (er < BOARD_SIZE - 1 && board[er + 1][p.col]) er++;
+        if (er > sr) {
+            let cw = '';
+            const cells = [];
+            for (let r = sr; r <= er; r++) {
+                cw += board[r][p.col].letter;
+                cells.push({ row: r, col: p.col });
+            }
+            // DODAJ SAMO AKO IMA 2+ SLOVA I NIJE ISTA KAO GLAVNA REČ
+            if (cw.length >= 2 && cw !== mainWord) {
+                allWords.push({ word: cw, cells });
+            }
         }
-        if (!DICTIONARY.has(w.word.toUpperCase())) {
-            invalidWords.push(`"${w.word}" (није у речнику)`);
+    } else {
+        let sc = p.col;
+        while (sc > 0 && board[p.row][sc - 1]) sc--;
+        let ec = p.col;
+        while (ec < BOARD_SIZE - 1 && board[p.row][ec + 1]) ec++;
+        if (ec > sc) {
+            let cw = '';
+            const cells = [];
+            for (let c = sc; c <= ec; c++) {
+                cw += board[p.row][c].letter;
+                cells.push({ row: p.row, col: c });
+            }
+            // DODAJ SAMO AKO IMA 2+ SLOVA I NIJE ISTA KAO GLAVNA REČ
+            if (cw.length >= 2 && cw !== mainWord) {
+                allWords.push({ word: cw, cells });
+            }
         }
     }
+}
+
+// Proveri da li uopšte ima validnih reči
+if (allWords.length === 0) {
+    for (const p of tempBoard) board[p.row][p.col] = null;
+    return { valid: false, error: 'Мораш формирати реч од најмање 2 слова.' };
+}
+    // Proveri rečnik
+// Proveri rečnik
+const invalidWords = [];
+for (const w of allWords) {
+    if (!DICTIONARY.has(w.word.toUpperCase())) {
+        invalidWords.push(`"${w.word}" (није у речнику)`);
+    }
+}
 
     if (invalidWords.length > 0) {
         for (const p of tempBoard) board[p.row][p.col] = null;
