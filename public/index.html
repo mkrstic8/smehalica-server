@@ -4,8 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Смехалица укрштеница — Online</title>
-    <style>
-        /* Animacije */
+        <style>
+        :root { --cell-size: 34px; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
         @keyframes bounceIn {
             0% { transform: scale(0.3); opacity: 0; }
             50% { transform: scale(1.1); }
@@ -25,32 +27,15 @@
             0%, 100% { box-shadow: 0 0 10px rgba(255,215,0,0.4); }
             50% { box-shadow: 0 0 30px rgba(255,215,0,0.9); }
         }
-        .cell.bounce { animation: bounceIn 0.4s ease; }
-        .cell.shake { animation: shake 0.5s ease; }
-        .rack-highlight { animation: glowPulse 0.8s ease-in-out 3; }
-        .confetti-piece {
-            position: fixed;
-            width: 10px;
-            height: 10px;
-            z-index: 999;
-            pointer-events: none;
-            animation: confetti 2s ease-out forwards;
-        } 
-        .particle {
-            position: fixed;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            z-index: 998;
-            pointer-events: none;
-            animation: particleFly 1s ease-out forwards;
+        @keyframes pulse {
+            0%,100%{box-shadow:0 0 3px rgba(255,200,0,0.4)}
+            50%{box-shadow:0 0 15px rgba(255,200,0,0.9)}
         }
         @keyframes particleFly {
             0% { transform: translate(0, 0) scale(1); opacity: 1; }
             100% { transform: translate(var(--dx), var(--dy)) scale(0); opacity: 0; }
         }
-        :root { --cell-size: 34px; }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #5c3d0a 0%, #8b6914 30%, #6b4c0a 60%, #3d2a05 100%);
@@ -69,43 +54,79 @@
         .game-container { background: rgba(255,255,255,0.08); border-radius: 14px; padding: 10px; backdrop-filter: blur(10px); box-shadow: 0 8px 32px rgba(0,0,0,0.4); display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 100%; }
         .board-wrapper { overflow: auto; max-width: 95vw; max-height: 55vh; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); -webkit-overflow-scrolling: touch; }
         .board { display: grid; grid-template-columns: repeat(15, var(--cell-size)); grid-template-rows: repeat(15, var(--cell-size)); gap: 1px; background: #1a0f05; padding: 2px; border-radius: 4px; }
-        .cell { width: var(--cell-size); height: var(--cell-size); background: #f0e0c8; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.95rem; cursor: pointer; transition: all 0.15s; position: relative; border-radius: 2px; min-width: var(--cell-size); min-height: var(--cell-size); }
+        
+        .cell { 
+            width: var(--cell-size); height: var(--cell-size); 
+            background: #f0e0c8; 
+            display: flex; align-items: center; justify-content: center; 
+            font-weight: bold; font-size: 0.95rem; cursor: pointer; 
+            transition: all 0.15s; position: relative; border-radius: 2px; 
+            min-width: var(--cell-size); min-height: var(--cell-size); 
+        }
         .cell:active { transform: scale(0.9); }
         .cell.occupied { background: #ffe4b5; cursor: default; box-shadow: inset 0 0 4px rgba(0,0,0,0.2); }
         .cell.newly-placed { background: #ffd700 !important; animation: pulse 0.4s ease-in-out 3; }
-        @keyframes pulse { 0%,100%{box-shadow:0 0 3px rgba(255,200,0,0.4)} 50%{box-shadow:0 0 15px rgba(255,200,0,0.9)} }
+        .cell.bounce { animation: bounceIn 0.4s ease; }
+        .cell.shake { animation: shake 0.5s ease; }
+        
+        /* BONUS POLJA */
         .cell.tw{background:#e57373}.cell.dw{background:#ffb74d}.cell.tl{background:#64b5f6}.cell.dl{background:#81c784}.cell.star{background:#ff8a80}
         .cell.occupied.tw,.cell.occupied.dw,.cell.occupied.tl,.cell.occupied.dl,.cell.occupied.star{background:#ffe4b5}
         .cell.tw::after,.cell.dw::after,.cell.tl::after,.cell.dl::after,.cell.star::after{position:absolute;font-size:0.45rem;font-weight:bold;color:rgba(0,0,0,0.55);pointer-events:none;line-height:1}
         .cell.tw::after{content:'3Р'}.cell.dw::after{content:'2Р'}.cell.tl::after{content:'3С'}.cell.dl::after{content:'2С'}.cell.star::after{content:'★';font-size:0.8rem}
         .cell.occupied.tw::after,.cell.occupied.dw::after,.cell.occupied.tl::after,.cell.occupied.dl::after,.cell.occupied.star::after{content:''}
+        
+        /* ZADNJA REČ - HIGHLIGHT */
         .cell.last-move { 
             background: #ff3d00 !important; 
             color: white !important;
             font-weight: 900 !important;
             box-shadow: 0 0 12px rgba(255,61,0,0.9), inset 0 0 8px rgba(255,255,255,0.3);
             z-index: 2;
-            transform: scale(1.03);
+            transform: scale(1.05);
         }
         .cell.last-move::after {
             content: '';
             position: absolute;
-            top: -2px;
-            left: -2px;
-            right: -2px;
-            bottom: -2px;
+            top: -2px; left: -2px; right: -2px; bottom: -2px;
             border: 2px solid #fff;
             border-radius: 3px;
             pointer-events: none;
             z-index: 3;
         }
+        
+        /* POENI NA TABLI */
+        .cell-point {
+            position: absolute;
+            bottom: 1px;
+            right: 2px;
+            font-size: 0.4rem;
+            font-weight: bold;
+            color: rgba(0,0,0,0.55);
+            line-height: 1;
+            pointer-events: none;
+            z-index: 1;
+        }
+        
         .rack-container { background: #4a2c10; padding: 8px 12px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; width: 100%; max-width: 650px; }
         .rack-label { font-weight: bold; color: #FFD700; font-size: 0.8rem; white-space: nowrap; }
         .rack { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; align-items: flex-end; }
-        .tile-wrapper { display: flex; flex-direction: column; align-items: center; gap: 1px; }
-        .tile { width: 38px; height: 38px; background: linear-gradient(180deg,#fff9e6 0%,#f0d9a0 50%,#c89840 100%); border: 2px solid #7a5810; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: bold; cursor: pointer; box-shadow: 0 3px 5px rgba(0,0,0,0.3); transition: all 0.2s; position: relative; }
+        .rack-highlight { animation: glowPulse 0.8s ease-in-out 3; }
+        
+        .tile-wrapper { position: relative; display: flex; flex-direction: column; align-items: center; }
+        .tile { 
+            width: 38px; height: 38px; 
+            background: linear-gradient(180deg,#fff9e6 0%,#f0d9a0 50%,#c89840 100%); 
+            border: 2px solid #7a5810; border-radius: 5px; 
+            display: flex; align-items: center; justify-content: center; 
+            font-size: 1.2rem; font-weight: bold; cursor: pointer; 
+            box-shadow: 0 3px 5px rgba(0,0,0,0.3); transition: all 0.2s; 
+            position: relative; 
+        }
         .tile:active { transform: scale(0.85); }
         .tile.selected { border: 3px solid #FFD700; box-shadow: 0 0 15px rgba(255,215,0,0.8); transform: translateY(-6px); }
+        
+        /* POENI NA PLOČICAMA U RUCI - mali broj, bez kruga */
         .tile-point {
             position: absolute;
             bottom: -1px;
@@ -113,14 +134,11 @@
             font-size: 0.45rem;
             font-weight: bold;
             color: #fff;
-            text-shadow: 1px 1px 1px rgba(0,0,0,0.7);
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.8);
             line-height: 1;
             z-index: 2;
-            background: none;
-            border-radius: 0;
-            width: auto;
-            height: auto;
         }
+        
         .score-display { display: flex; gap: 10px; font-size: 0.9rem; font-weight: bold; flex-wrap: wrap; justify-content: center; }
         .score-item { background: rgba(0,0,0,0.35); padding: 6px 12px; border-radius: 8px; text-align: center; min-width: 60px; }
         .score-item.active-player { border: 2px solid #FFD700; box-shadow: 0 0 10px rgba(255,215,0,0.5); }
@@ -136,8 +154,10 @@
         button:disabled{opacity:0.4;cursor:not-allowed;transform:none!important}
         .message-box { background: rgba(0,0,0,0.45); padding: 8px 12px; border-radius: 8px; text-align: center; font-size: 0.85rem; min-height: 36px; display: flex; align-items: center; justify-content: center; width: 100%; max-width: 600px; flex-wrap: wrap; gap: 4px; }
         .message-box.error{color:#ff6b6b}.message-box.success{color:#51cf66}.message-box.info{color:#64b5f6}
-        .turn-indicator { font-size: 1rem; font-weight: bold; padding: 4px 12px; border-radius: 16px; animation: glowPulse 1.5s ease-in-out infinite; }
-        @keyframes glowPulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+        .turn-indicator { font-size: 1rem; font-weight: bold; padding: 4px 12px; border-radius: 16px; }
+        .turn-indicator.your-turn { color: #64b5f6; animation: glowPulse 1.5s ease-in-out infinite; }
+        .turn-indicator.opponent-turn { color: #ffab40; animation: glowPulse 1.5s ease-in-out infinite; }
+        .turn-indicator.game-over-state { color: #FFD700; animation: none; }
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 100; }
         .overlay-content { background: #2d6a2d; padding: 25px; border-radius: 15px; text-align: center; max-width: 400px; width: 90%; }
         .overlay-content h2 { color: #FFD700; margin-bottom: 15px; }
@@ -151,50 +171,28 @@
         .chat-input-row { display: flex; gap: 4px; }
         .chat-input-row input { flex: 1; padding: 6px 10px; border-radius: 15px; border: none; font-size: 0.8rem; background: rgba(255,255,255,0.9); }
         .chat-input-row button { padding: 6px 12px; }
-        /* FIX #1: Turn indicator boje */
-        .turn-indicator.your-turn { color: #64b5f6; }
-        .turn-indicator.opponent-turn { color: #ffab40; }
-        .turn-indicator.game-over-state { color: #FFD700; animation: none; }
+        .confetti-piece {
+            position: fixed;
+            width: 10px; height: 10px;
+            z-index: 999;
+            pointer-events: none;
+            animation: confetti 2s ease-out forwards;
+        } 
+        .particle {
+            position: fixed;
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            z-index: 998;
+            pointer-events: none;
+            animation: particleFly 1s ease-out forwards;
+        }
+        
         @media (max-width: 600px) {
             :root{--cell-size:21px}
             h1{font-size:1.2rem}
             .tile{width:32px;height:32px;font-size:1rem}
             button{padding:6px 10px;font-size:0.7rem}
             .cell{font-size:0.65rem}
-        }
-                /* Poeni na pločici na tabli */
-        .cell.occupied {
-            position: relative;
-        }
-        .cell-point {
-            position: absolute;
-            bottom: 1px;
-            right: 2px;
-            font-size: 0.4rem;
-            font-weight: bold;
-            color: rgba(0,0,0,0.55);
-            line-height: 1;
-            pointer-events: none;
-        }
-        /* Poeni u ruci — već postojeći tile-point ostaje, samo ga pozicioniramo */
-        .tile-wrapper {
-            position: relative;
-        }
-        .tile-point {
-            position: absolute;
-            bottom: -2px;
-            right: -2px;
-            font-size: 0.5rem;
-            font-weight: bold;
-            color: #fff;
-            background: rgba(0,0,0,0.6);
-            border-radius: 50%;
-            width: 16px;
-            height: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            line-height: 1;
         }
     </style>
 </head>
@@ -769,10 +767,13 @@
                     if (boardState[r] && boardState[r][c]) {
                         cell.textContent = boardState[r][c].letter;
                         cell.classList.add('occupied');
-                        if (lastMoveCells.some(p => p.row === r && p.col === c)) {
+                        
+                        // Proveri da li je ovo deo zadnje reči
+                        if (lastMoveCells && lastMoveCells.some(p => p.row === r && p.col === c)) {
                             cell.classList.add('last-move');
                         }
-                        // Dodaj poene u donjem desnom uglu
+                        
+                        // Dodaj poene
                         const pointSpan = document.createElement('span');
                         pointSpan.className = 'cell-point';
                         pointSpan.textContent = letterValues[boardState[r][c].letter] || 0;
@@ -785,12 +786,13 @@
                     boardEl.appendChild(cell);
                 }
             }
+            
+            // Prikaži privremeno postavljene pločice
             for (const p of newlyPlacedCells) {
                 const cell = boardEl.querySelector(`[data-row="${p.row}"][data-col="${p.col}"]`);
                 if (cell) {
                     cell.textContent = p.letter;
                     cell.classList.add('occupied', 'newly-placed');
-                    // Dodaj poene
                     let pointSpan = cell.querySelector('.cell-point');
                     if (!pointSpan) {
                         pointSpan = document.createElement('span');
