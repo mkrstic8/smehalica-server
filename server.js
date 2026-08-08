@@ -328,8 +328,7 @@ function validateMove(game, playerId, placements) {
         }
     }
 
-    // Sakupljanje svih formiranih reči
-    const allWords = [{ word: mainWord, cells: mainCells }];
+
 
 // Sakupljanje svih formiranih reči
 const allWords = [];
