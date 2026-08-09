@@ -7,7 +7,11 @@
     <meta http-equiv="Expires" content="0">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Смехалица укрштеница — Online</title>
-        <style>
+    
+    <!-- ⚠️ OVO JE BITNO ZA AdMob: -->
+    <script src="https://unpkg.com/@capacitor/core/dist/global.js"></script>
+    
+    <style>
         :root { --cell-size: 34px; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
@@ -311,6 +315,65 @@
     <script>
         // ==================== KONEKCIJA ====================
         const SERVER_URL = 'wss://smehalica-server.onrender.com';
+        
+        // ==================== AdMob MONETIZACIJA ====================
+        console.log('🔴 1. AdMob kod se učitava...');
+        
+        async function initAdMob() {
+            try {
+                console.log('🔴 2. initAdMob() pozvan');
+                
+                // Proveri da li Capacitor postoji
+                if (typeof Capacitor === 'undefined') {
+                    console.error('❌ Capacitor nije definisan!');
+                    return;
+                }
+                console.log('✅ Capacitor postoji');
+                
+                if (!Capacitor.Plugins) {
+                    console.error('❌ Capacitor.Plugins nije definisan!');
+                    return;
+                }
+                console.log('✅ Capacitor.Plugins postoji');
+                
+                const { AdMob } = Capacitor.Plugins;
+                if (!AdMob) {
+                    console.error('❌ AdMob plugin nije pronadjen!');
+                    return;
+                }
+                console.log('✅ AdMob plugin uzet');
+                
+                await AdMob.initialize();
+                console.log('✅ AdMob inicijalizovan!');
+            } catch (error) {
+                console.error('❌ AdMob greška:', error);
+            }
+        }
+        
+        async function showBanner() {
+            try {
+                console.log('🔴 3. showBanner() pozvan');
+                const { AdMob } = Capacitor.Plugins;
+                await AdMob.showBanner({
+                    adId: 'ca-app-pub-7529348168507963/9650452828',
+                    adSize: 'BANNER',
+                    position: 'BOTTOM_CENTER',
+                    margin: 0,
+                    isTesting: true,  // STAVI TRUE ZA TEST
+                });
+                console.log('✅ Banner prikazan!');
+            } catch (error) {
+                console.error('❌ Banner greška:', error);
+            }
+        }
+        
+        // Pokreni AdMob
+        console.log('🔴 4. Postavljam timeout za AdMob...');
+        setTimeout(() => {
+            console.log('🔴 5. Pokrećem AdMob...');
+            initAdMob();
+            setTimeout(showBanner, 3000);
+        }, 2000);
         
         // ==================== ZVUCI (Web Audio API) ====================
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
