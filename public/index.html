@@ -316,64 +316,50 @@
         // ==================== KONEKCIJA ====================
         const SERVER_URL = 'wss://smehalica-server.onrender.com';
         
-        // ==================== AdMob MONETIZACIJA ====================
-        console.log('🔴 1. AdMob kod se učitava...');
-        
-        async function initAdMob() {
-            try {
-                console.log('🔴 2. initAdMob() pozvan');
-                
-                // Proveri da li Capacitor postoji
-                if (typeof Capacitor === 'undefined') {
-                    console.error('❌ Capacitor nije definisan!');
-                    return;
-                }
-                console.log('✅ Capacitor postoji');
-                
-                if (!Capacitor.Plugins) {
-                    console.error('❌ Capacitor.Plugins nije definisan!');
-                    return;
-                }
-                console.log('✅ Capacitor.Plugins postoji');
-                
-                const { AdMob } = Capacitor.Plugins;
-                if (!AdMob) {
-                    console.error('❌ AdMob plugin nije pronadjen!');
-                    return;
-                }
-                console.log('✅ AdMob plugin uzet');
-                
-                await AdMob.initialize();
-                console.log('✅ AdMob inicijalizovan!');
-            } catch (error) {
-                console.error('❌ AdMob greška:', error);
-            }
-        }
-        
-        async function showBanner() {
-            try {
-                console.log('🔴 3. showBanner() pozvan');
-                const { AdMob } = Capacitor.Plugins;
-                await AdMob.showBanner({
-                    adId: 'ca-app-pub-7529348168507963/9650452828',
-                    adSize: 'BANNER',
-                    position: 'BOTTOM_CENTER',
-                    margin: 0,
-                    isTesting: true,  // STAVI TRUE ZA TEST
-                });
-                console.log('✅ Banner prikazan!');
-            } catch (error) {
-                console.error('❌ Banner greška:', error);
-            }
-        }
-        
-        // Pokreni AdMob
-        console.log('🔴 4. Postavljam timeout za AdMob...');
-        setTimeout(() => {
-            console.log('🔴 5. Pokrećem AdMob...');
-            initAdMob();
-            setTimeout(showBanner, 3000);
-        }, 2000);
+// ==================== AdMob MONETIZACIJA ====================
+const TEST_MODE = true; // ⚠️ Privremeno stavi true dok testiraš da li banner uopšte radi
+
+async function initAdMob() {
+    try {
+        const { AdMob } = Capacitor.Plugins;
+        await AdMob.initialize({
+            // Opciono: navedi test uređaje da ne rizikuješ nalog dok razvijaš
+            // testingDevices: ['TVOJ_DEVICE_ID'],
+            initializeForTesting: TEST_MODE,
+        });
+        console.log('✅ AdMob inicijalizovan');
+        await showBanner(); // pozovi banner TEK kad je init gotov, ne posle proizvoljnog timeout-a
+    } catch (error) {
+        console.error('❌ Greska pri inicijalizaciji AdMob-a:', error);
+    }
+}
+
+async function showBanner() {
+    try {
+        const { AdMob } = Capacitor.Plugins;
+        await AdMob.showBanner({
+            adId: TEST_MODE
+                ? 'ca-app-pub-3940256099942544/6300978111' // Google-ov zvanični test banner ID
+                : 'ca-app-pub-7529348168507963/9650452828',
+            adSize: 'BANNER',
+            position: 'BOTTOM_CENTER',
+            margin: 0,
+            isTesting: TEST_MODE,
+        });
+        console.log('✅ Banner prikazan');
+    } catch (error) {
+        console.error('❌ Greska pri prikazivanju banera:', JSON.stringify(error));
+    }
+}
+
+// Pokreni AdMob kada se aplikacija ucita
+document.addEventListener('DOMContentLoaded', () => {
+    if (window.Capacitor && Capacitor.isNativePlatform()) {
+        initAdMob();
+    } else {
+        console.log('ℹ️ Nije native platforma — AdMob preskočen (radiš u browseru?)');
+    }
+});
         
         // ==================== ZVUCI (Web Audio API) ====================
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
