@@ -148,12 +148,12 @@ function createGame(player1Id, player2Id) {
         bag: bag,
         players: {
             [player1Id]: {
-                rack: drawTiles(bag, 7),
+                rack: drawTiles(bag, 8),
                 score: 0,
                 playerNum: 1
             },
             [player2Id]: {
-                rack: drawTiles(bag, 7),
+                rack: drawTiles(bag, 8),
                 score: 0,
                 playerNum: 2
             }
