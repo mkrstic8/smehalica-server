@@ -1,11 +1,14 @@
-const WebSocket = require('ws');
 const { v4: uuidv4 } = require('uuid');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { Server } = require('socket.io');
+
 // ==================== KONFIGURACIJA ====================
 const PORT = process.env.PORT || 3000;
 const BOARD_SIZE = 15;
+const DISCONNECT_GRACE_MS = 2 * 60 * 1000; // 2 minuta pre predaje
+const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 
 // Bonus tabla
 const bonusBoard = [
@@ -43,8 +46,6 @@ const tileDistribution = [
 ];
 
 // ==================== REČNIK ====================
-// Učitaj reči iz fajla (ili koristi ugrađeni demo set)
-// ==================== REČNIK ====================
 let DICTIONARY = new Set();
 
 try {
@@ -52,7 +53,7 @@ try {
     const words = dictFile.split(/[\n\r]+/)
         .map(w => w.trim().toUpperCase())
         .filter(w => /^[АБВГДЂЕЖЗИЈКЛЉМНЊОПРСТЋУФХЦЧЏШ]+$/.test(w))
-        .filter(w => w.length >= 3 && w.length <= 15); // SAMO 3+ slova iz fajla
+        .filter(w => w.length >= 3 && w.length <= 15);
     DICTIONARY = new Set(words);
     console.log(`📚 Rečnik učitan iz fajla: ${DICTIONARY.size} reči (3+ slova)`);
 } catch (e) {
@@ -80,26 +81,23 @@ const allowedTwoLetterWords = [
     'ШУ'
 ];
 
-for (const w of allowedTwoLetterWords) {
-    DICTIONARY.add(w);
-}
+for (const w of allowedTwoLetterWords) DICTIONARY.add(w);
 
 console.log(`📚 Dodato ${allowedTwoLetterWords.length} dvoslovnih reči`);
 console.log(`📚 Ukupno reči u rečniku: ${DICTIONARY.size}`);
 
 // ==================== STANJE IGARA ====================
 const games = {};        // gameId -> gameState
-const players = {};      // playerId -> { ws, gameId, playerNum, name }
-const matchmaking = [];  // igrači koji čekaju protivnika
-const rooms = {};  // { linkKod: { gameId, creatorId, createdAt } }
+const players = {};      // playerId -> { socket, gameId, playerNum, name, disconnectTimer, ... }
+const matchmaking = new Set(); // Set igrača koji čekaju
+const rooms = {};        // linkKod -> { creatorId, createdAt }
+
 // ==================== POMOĆNE FUNKCIJE ====================
 function createBag() {
     const bag = [];
     for (const [letter, count] of tileDistribution) {
         for (let i = 0; i < count; i++) bag.push(letter);
     }
-    
-    // Fisher-Yates shuffle
     for (let i = bag.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [bag[i], bag[j]] = [bag[j], bag[i]];
@@ -125,16 +123,17 @@ function createEmptyBoard() {
     }
     return board;
 }
+
 function generateRoomLink() {
     const slova = 'АБВГДЂЕЖЗИЈКЛЉМНЊОПРСТЋУФХЦЧЏШ';
     let link = '';
     for (let i = 0; i < 5; i++) {
         link += slova[Math.floor(Math.random() * slova.length)];
     }
-    // Proveri da nije duplikat
     if (rooms[link]) return generateRoomLink();
     return link;
 }
+
 function createGame(player1Id, player2Id) {
     const gameId = uuidv4().substring(0, 8).toUpperCase();
     const bag = createBag();
@@ -157,12 +156,11 @@ function createGame(player1Id, player2Id) {
         },
         currentTurn: player1Id,
         isFirstMove: true,
-        status: 'active', // active, finished
+        status: 'active',
         winner: null,
         lastMove: null,
-        turnStartTime: Date.now(),
-        createdAt: Date.now(),
-        skipCount: 0
+        skipCount: 0,
+        createdAt: Date.now()
     };
 
     games[gameId] = game;
@@ -172,6 +170,16 @@ function createGame(player1Id, player2Id) {
     players[player1Id].playerNum = 1;
     players[player2Id].gameId = gameId;
     players[player2Id].playerNum = 2;
+
+    // Dodaj igrače u Socket.IO room (ako su konektovani)
+    if (players[player1Id].socket) {
+        players[player1Id].socket.join(gameId);
+        players[player1Id].socket.data.gameId = gameId;
+    }
+    if (players[player2Id].socket) {
+        players[player2Id].socket.join(gameId);
+        players[player2Id].socket.data.gameId = gameId;
+    }
 
     return game;
 }
@@ -198,7 +206,7 @@ function getGameState(game, playerId) {
     };
 }
 
-// ==================== VALIDACIJA POTEZA ====================
+// ==================== VALIDACIJA POTEZA (isto kao i pre) ====================
 function validateMove(game, playerId, placements) {
     if (game.currentTurn !== playerId) {
         return { valid: false, error: 'Није твој потез.' };
@@ -245,7 +253,6 @@ function validateMove(game, playerId, placements) {
     const uniqueCols = [...new Set(cols)];
 
     if (uniqueRows.length !== 1 && uniqueCols.length !== 1) {
-        // Rollback
         for (const p of tempBoard) board[p.row][p.col] = null;
         return { valid: false, error: 'Сва слова морају бити у истом реду или колони.' };
     }
@@ -259,7 +266,6 @@ function validateMove(game, playerId, placements) {
         const minCol = Math.min(...cols);
         const maxCol = Math.max(...cols);
 
-        // Proveri praznine
         for (let c = minCol; c <= maxCol; c++) {
             if (!board[row][c]) {
                 for (const p of tempBoard) board[p.row][p.col] = null;
@@ -326,68 +332,64 @@ function validateMove(game, playerId, placements) {
         }
     }
 
+    // Sakupljanje svih formiranih reči
+    const allWords = [];
 
+    // Dodaj glavnu reč samo ako ima 2+ slova
+    if (mainWord.length >= 2) {
+        allWords.push({ word: mainWord, cells: mainCells });
+    }
 
-// Sakupljanje svih formiranih reči
-const allWords = [];
-
-// DODAJ GLAVNU REČ SAMO AKO IMA 2+ SLOVA
-if (mainWord.length >= 2) {
-    allWords.push({ word: mainWord, cells: mainCells });
-}
-
-// Unakrsne reči
-for (const p of tempBoard) {
-    if (isHorizontal) {
-        let sr = p.row;
-        while (sr > 0 && board[sr - 1][p.col]) sr--;
-        let er = p.row;
-        while (er < BOARD_SIZE - 1 && board[er + 1][p.col]) er++;
-        if (er > sr) {
-            let cw = '';
-            const cells = [];
-            for (let r = sr; r <= er; r++) {
-                cw += board[r][p.col].letter;
-                cells.push({ row: r, col: p.col });
+    // Unakrsne reči
+    for (const p of tempBoard) {
+        if (isHorizontal) {
+            let sr = p.row;
+            while (sr > 0 && board[sr - 1][p.col]) sr--;
+            let er = p.row;
+            while (er < BOARD_SIZE - 1 && board[er + 1][p.col]) er++;
+            if (er > sr) {
+                let cw = '';
+                const cells = [];
+                for (let r = sr; r <= er; r++) {
+                    cw += board[r][p.col].letter;
+                    cells.push({ row: r, col: p.col });
+                }
+                if (cw.length >= 2 && cw !== mainWord) {
+                    allWords.push({ word: cw, cells });
+                }
             }
-            // DODAJ SAMO AKO IMA 2+ SLOVA I NIJE ISTA KAO GLAVNA REČ
-            if (cw.length >= 2 && cw !== mainWord) {
-                allWords.push({ word: cw, cells });
-            }
-        }
-    } else {
-        let sc = p.col;
-        while (sc > 0 && board[p.row][sc - 1]) sc--;
-        let ec = p.col;
-        while (ec < BOARD_SIZE - 1 && board[p.row][ec + 1]) ec++;
-        if (ec > sc) {
-            let cw = '';
-            const cells = [];
-            for (let c = sc; c <= ec; c++) {
-                cw += board[p.row][c].letter;
-                cells.push({ row: p.row, col: c });
-            }
-            // DODAJ SAMO AKO IMA 2+ SLOVA I NIJE ISTA KAO GLAVNA REČ
-            if (cw.length >= 2 && cw !== mainWord) {
-                allWords.push({ word: cw, cells });
+        } else {
+            let sc = p.col;
+            while (sc > 0 && board[p.row][sc - 1]) sc--;
+            let ec = p.col;
+            while (ec < BOARD_SIZE - 1 && board[p.row][ec + 1]) ec++;
+            if (ec > sc) {
+                let cw = '';
+                const cells = [];
+                for (let c = sc; c <= ec; c++) {
+                    cw += board[p.row][c].letter;
+                    cells.push({ row: p.row, col: c });
+                }
+                if (cw.length >= 2 && cw !== mainWord) {
+                    allWords.push({ word: cw, cells });
+                }
             }
         }
     }
-}
 
-// Proveri da li uopšte ima validnih reči
-if (allWords.length === 0) {
-    for (const p of tempBoard) board[p.row][p.col] = null;
-    return { valid: false, error: 'Мораш формирати реч од најмање 2 слова.' };
-}
+    // Proveri da li uopšte ima validnih reči
+    if (allWords.length === 0) {
+        for (const p of tempBoard) board[p.row][p.col] = null;
+        return { valid: false, error: 'Мораш формирати реч од најмање 2 слова.' };
+    }
+
     // Proveri rečnik
-// Proveri rečnik
-const invalidWords = [];
-for (const w of allWords) {
-    if (!DICTIONARY.has(w.word.toUpperCase())) {
-        invalidWords.push(`"${w.word}" (није у речнику)`);
+    const invalidWords = [];
+    for (const w of allWords) {
+        if (!DICTIONARY.has(w.word.toUpperCase())) {
+            invalidWords.push(`"${w.word}" (није у речнику)`);
+        }
     }
-}
 
     if (invalidWords.length > 0) {
         for (const p of tempBoard) board[p.row][p.col] = null;
@@ -435,10 +437,8 @@ for (const w of allWords) {
         placements: tempBoard
     };
 }
-
-// ==================== WEBSOCKET SERVER ====================
-const server = http.createServer((req, res) => {
-    // Serviraj index.html za glavnu stranicu
+// ==================== SOCKET.IO SERVER ====================
+const httpServer = http.createServer((req, res) => {
     if (req.url === '/' || req.url === '/index.html') {
         const filePath = path.join(__dirname, 'public', 'index.html');
         try {
@@ -453,345 +453,317 @@ const server = http.createServer((req, res) => {
                 error: 'HTML fajl nije pronađen. Kreiraj public/index.html'
             }));
         }
-    }
-    // Status endpoint
-    else if (req.url === '/status') {
+    } else if (req.url === '/status') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
             server: 'Смехалица укрштеница',
             version: '1.0.0',
             activeGames: Object.keys(games).length,
             playersOnline: Object.keys(players).length,
-            dictionarySize: DICTIONARY.size
+            dictionarySize: DICTIONARY.size,
+            waitingPlayers: matchmaking.size
         }));
-    }
-    else {
+    } else {
         res.writeHead(404);
         res.end('Stranica ne postoji');
     }
 });
 
-const wss = new WebSocket.Server({ server });
+const io = new Server(httpServer, {
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    },
+    // Možeš dodati pingTimeout, pingInterval za bolju kontrolu
+    pingTimeout: 60000,
+    pingInterval: 25000
+});
 
-wss.on('connection', (ws) => {
-    const playerId = uuidv4();
-    players[playerId] = { ws, gameId: null, playerNum: null, name: 'Играч' };
+// ==================== MIDDLEWARE ZA IGRAČE ====================
+io.use((socket, next) => {
+    // Trajni playerId se šalje u auth
+    const authPlayerId = socket.handshake.auth.playerId;
+    let playerId;
+    if (authPlayerId && players[authPlayerId]) {
+        playerId = authPlayerId;
+    } else {
+        playerId = authPlayerId || uuidv4();
+    }
+    socket.data.playerId = playerId;
+    next();
+});
 
-    console.log(`🔌 Играч повезан: ${playerId.substring(0, 8)}`);
+// ==================== KONEKCIJA ====================
+io.on('connection', (socket) => {
+    const playerId = socket.data.playerId;
+    console.log(`🔌 Novi socket: ${socket.id} (playerId: ${playerId.substring(0,8)})`);
 
-    // Pošalji ID igraču
-    send(ws, {
-        type: 'connected',
+    // Ako igrač već postoji u players, ažuriraj socket i otkaži disconnect tajmer
+    if (players[playerId]) {
+        const existingPlayer = players[playerId];
+        existingPlayer.socket = socket;
+        if (existingPlayer.disconnectTimer) {
+            clearTimeout(existingPlayer.disconnectTimer);
+            existingPlayer.disconnectTimer = null;
+        }
+        console.log(`🔁 Igrač se ponovo povezao: ${playerId.substring(0,8)}`);
+    } else {
+        players[playerId] = {
+            socket: socket,
+            gameId: null,
+            playerNum: null,
+            name: 'Играч',
+            disconnectTimer: null
+        };
+    }
+
+    // Pošalji potvrdu sa playerId
+    socket.emit('connected', {
         playerId: playerId,
         message: 'Повезан/а на сервер Смехалице!'
     });
 
-        ws.on('message', (data) => {
-        try {
-            const raw = data.toString();
-            console.log('📨 Primljena poruka:', raw.substring(0, 200)); // Loguj prvih 200 karaktera
-            const message = JSON.parse(raw);
-            console.log('✅ Parsiran tip:', message.type);
-            handleMessage(playerId, message);
-        } catch (e) {
-            console.error('❌ Greška u parsiranju:', e.message);
-            console.error('📄 Sirovi podaci:', data.toString().substring(0, 200));
-            send(ws, { type: 'error', message: 'Неважећи формат поруке.' });
+    // Ako je igrač već u aktivnoj igri, automatski pošalji stanje
+    if (players[playerId].gameId) {
+        const game = games[players[playerId].gameId];
+        if (game && game.status === 'active') {
+            const state = getGameState(game, playerId);
+            state.type = 'game_state';
+            const opponentId = Object.keys(game.players).find(id => id !== playerId);
+            state.opponentName = players[opponentId]?.name || 'Противник';
+            socket.emit('game_state', state);
+        }
+    }
+
+    // ---------- EVENTI ----------
+    socket.on('set_name', (data) => {
+        if (players[playerId]) {
+            players[playerId].name = data.name || 'Играч';
+            socket.emit('name_set', { name: players[playerId].name });
         }
     });
 
-    ws.on('close', () => {
-        console.log(`🔌 Играч искључен: ${playerId.substring(0, 8)}`);
-        handleDisconnect(playerId);
-        delete players[playerId];
+    socket.on('create_room', () => {
+        handleCreateRoom(socket, playerId);
     });
 
-    ws.on('error', (err) => {
-        console.error(`❌ WebSocket greška za ${playerId.substring(0, 8)}:`, err.message);
+    socket.on('join_room', (data) => {
+        handleJoinRoom(socket, playerId, data.roomLink);
+    });
+
+    socket.on('quick_match', () => {
+        handleFindGame(socket, playerId);
+    });
+
+    socket.on('cancel_find', () => {
+        handleCancelFind(socket, playerId);
+    });
+
+    socket.on('place_tiles', (data) => {
+        handlePlaceTiles(socket, playerId, data.placements);
+    });
+
+    socket.on('skip_turn', () => {
+        handleSkipTurn(socket, playerId);
+    });
+
+    socket.on('get_state', () => {
+        handleGetState(socket, playerId);
+    });
+
+    socket.on('resign', () => {
+        handleResign(socket, playerId);
+    });
+
+    socket.on('chat', (data) => {
+        handleChat(socket, playerId, data.text);
+    });
+
+    socket.on('request_rematch', () => {
+        handleRematchRequest(socket, playerId);
+    });
+
+    socket.on('accept_rematch', (data) => {
+        handleAcceptRematch(socket, playerId, data.fromId);
+    });
+
+    socket.on('decline_rematch', (data) => {
+        handleDeclineRematch(socket, playerId, data.fromId);
+    });
+
+    socket.on('leave_game', () => {
+        handleLeaveGame(socket, playerId);
+    });
+
+    socket.on('ping', () => {
+        socket.emit('pong');
+    });
+
+    socket.on('disconnect', () => {
+        handleDisconnect(socket, playerId);
+    });
+
+    socket.on('error', (err) => {
+        console.error(`❌ Socket greška za ${playerId.substring(0,8)}:`, err.message);
     });
 });
 
-function send(ws, message) {
-    if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify(message));
-    }
-}
-
-function sendToPlayer(playerId, message) {
+// ==================== POMOĆNE ZA SOCKET ====================
+function sendToPlayer(playerId, event, data) {
     const player = players[playerId];
-    if (player && player.ws) {
-        send(player.ws, message);
+    if (player && player.socket) {
+        player.socket.emit(event, data);
+    } else {
+        console.warn(`⚠️ Pokušaj slanja igraču ${playerId.substring(0,8)} koji nije povezan`);
     }
 }
 
-function broadcastToGame(gameId, message, excludePlayerId = null) {
-    const game = games[gameId];
-    if (!game) return;
-    for (const pid of Object.keys(game.players)) {
-        if (pid !== excludePlayerId) {
-            sendToPlayer(pid, message);
-        }
+function sendToGame(gameId, event, data, excludePlayerId = null) {
+    if (excludePlayerId) {
+        io.to(gameId).except(players[excludePlayerId]?.socket?.id).emit(event, data);
+    } else {
+        io.to(gameId).emit(event, data);
     }
 }
 
-// ==================== HANDLERI PORUKA ====================
-function handleMessage(playerId, message) {
-    const { type } = message;
-
-    switch (type) {
-        case 'set_name':
-            if (players[playerId]) {
-                players[playerId].name = message.name || 'Igrac';
-                sendToPlayer(playerId, { type: 'name_set', name: players[playerId].name });
-            }
-            break;
-
-        case 'create_room':
-            handleCreateRoom(playerId);
-            break;
-
-        case 'join_room':
-            handleJoinRoom(playerId, message.roomLink);
-            break;
-
-        case 'quick_match':
-            handleFindGame(playerId);
-            break;
-
-        case 'cancel_find':
-            handleCancelFind(playerId);
-            break;
-
-        case 'place_tiles':
-            handlePlaceTiles(playerId, message.placements);
-            break;
-
-        case 'skip_turn':
-            handleSkipTurn(playerId);
-            break;
-
-        case 'get_state':
-            handleGetState(playerId);
-            break;
-
-        case 'resign':
-            handleResign(playerId);
-            break;
-
-        case 'chat':
-            handleChat(playerId, message.text);
-            break;
-
-        case 'ping':
-            sendToPlayer(playerId, { type: 'pong' });
-            break;
-
-        case 'request_rematch':
-            handleRematchRequest(playerId);
-            break;
-
-        case 'accept_rematch':
-            handleAcceptRematch(playerId, message.fromId);
-            break;
-
-        case 'decline_rematch':
-            handleDeclineRematch(playerId, message.fromId);
-            break;
-        case 'leave_game':
-            handleLeaveGame(playerId);
-            break;
-        default:
-            console.log('Nepoznat tip poruke:', type);
-            sendToPlayer(playerId, { type: 'error', message: 'Nepoznat tip poruke: ' + type });
-    }
-}
-function handleCreateRoom(playerId) {
+// ==================== HANDLERI ====================
+function handleCreateRoom(socket, playerId) {
     const player = players[playerId];
     if (!player) return;
     if (player.gameId) {
-        sendToPlayer(playerId, { type: 'error', message: 'Већ си у игри.' });
+        socket.emit('error', { message: 'Већ си у игри.' });
         return;
     }
-    
     const link = generateRoomLink();
-    // Kreiraj praznu sobu (igra još nije aktivna)
     rooms[link] = {
         creatorId: playerId,
         createdAt: Date.now()
     };
-    
-    sendToPlayer(playerId, {
-        type: 'room_created',
+    socket.emit('room_created', {
         roomLink: link,
         message: `Соба креирана! Пошаљи линк противнику: ${link}`
     });
-    
     console.log(`🏠 Soba kreirana: ${link} od strane ${player.name}`);
 }
 
-function handleJoinRoom(playerId, roomLink) {
+function handleJoinRoom(socket, playerId, roomLink) {
     const player = players[playerId];
     if (!player) return;
     if (player.gameId) {
-        sendToPlayer(playerId, { type: 'error', message: 'Већ си у игри.' });
+        socket.emit('error', { message: 'Већ си у игри.' });
         return;
     }
-    
     if (!roomLink || !rooms[roomLink]) {
-        sendToPlayer(playerId, { type: 'error', message: 'Соба не постоји или је линк неважећи.' });
+        socket.emit('error', { message: 'Соба не постоји или је линк неважећи.' });
         return;
     }
-    
     const room = rooms[roomLink];
     const creatorId = room.creatorId;
-    
     if (!players[creatorId] || players[creatorId].gameId) {
         delete rooms[roomLink];
-        sendToPlayer(playerId, { type: 'error', message: 'Креатор собе више није доступан.' });
+        socket.emit('error', { message: 'Креатор собе више није доступан.' });
         return;
     }
-    
+    if (creatorId === playerId) {
+        socket.emit('error', { message: 'Не можеш се придружити сопственој соби.' });
+        return;
+    }
+
     // Kreiraj igru
     const game = createGame(creatorId, playerId);
-    
+
     // Obavesti oba igrača
     const state1 = getGameState(game, creatorId);
     state1.type = 'game_start';
     state1.opponentName = player.name;
     state1.yourPlayerNum = 1;
-    sendToPlayer(creatorId, state1);
-    
+    sendToPlayer(creatorId, 'game_start', state1);
+
     const state2 = getGameState(game, playerId);
     state2.type = 'game_start';
     state2.opponentName = players[creatorId].name;
     state2.yourPlayerNum = 2;
-    sendToPlayer(playerId, state2);
-    
-    // Obriši sobu
+    sendToPlayer(playerId, 'game_start', state2);
+
     delete rooms[roomLink];
-    
     console.log(`🎮 Igra ${game.id}: ${players[creatorId].name} vs ${player.name} (soba: ${roomLink})`);
 }
 
-function handleGetRoomLink(playerId) {
-    const player = players[playerId];
-    if (!player || !player.gameId) {
-        sendToPlayer(playerId, { type: 'error', message: 'Ниси у игри.' });
-        return;
-    }
-    
-    const game = games[player.gameId];
-    if (!game) return;
-    
-    // Generiši link za postojeću igru (za deljenje)
-    const link = generateRoomLink();
-    rooms[link] = { creatorId: playerId, gameId: player.gameId, createdAt: Date.now() };
-    
-    sendToPlayer(playerId, {
-        type: 'room_link',
-        roomLink: link,
-        message: `Линк за дељење: ${link}`
-    });
-}
-function handleFindGame(playerId) {
+function handleFindGame(socket, playerId) {
     const player = players[playerId];
     if (!player) return;
-
-    // Ako je već u igri
     if (player.gameId) {
-        sendToPlayer(playerId, {
-            type: 'error',
-            message: 'Већ си у игри.'
-        });
+        socket.emit('error', { message: 'Већ си у игри.' });
         return;
     }
 
-    // Ukloni iz matchmaking-a ako već čeka
-    const existingIndex = matchmaking.indexOf(playerId);
-    if (existingIndex >= 0) {
-        matchmaking.splice(existingIndex, 1);
+    // Ako je već u matchmaking-u, ne dozvoli dupliranje
+    if (matchmaking.has(playerId)) {
+        socket.emit('finding_game', { message: 'Већ тражиш противника...' });
+        return;
     }
 
-    // Pokušaj da nađeš protivnika
-    if (matchmaking.length > 0) {
-        const opponentId = matchmaking.shift();
-
-        // Proveri da li je opponent još uvek dostupan
-        if (!players[opponentId] || players[opponentId].gameId) {
-            // Opponent više nije dostupan, traži dalje
-            matchmaking.push(playerId);
-            sendToPlayer(playerId, {
-                type: 'finding_game',
-                message: 'Тражим противника...'
-            });
-            return;
+    // Pronađi protivnika (koji nije sam igrač)
+    let opponentId = null;
+    for (const id of matchmaking) {
+        if (id !== playerId && players[id] && !players[id].gameId) {
+            opponentId = id;
+            break;
         }
+    }
 
-        // Kreiraj igru
+    if (opponentId) {
+        matchmaking.delete(opponentId);
         const game = createGame(playerId, opponentId);
 
-        // Obavesti oba igrača
         const state1 = getGameState(game, playerId);
         state1.type = 'game_start';
         state1.opponentName = players[opponentId].name;
         state1.yourPlayerNum = 1;
-        sendToPlayer(playerId, state1);
+        sendToPlayer(playerId, 'game_start', state1);
 
         const state2 = getGameState(game, opponentId);
         state2.type = 'game_start';
         state2.opponentName = players[playerId].name;
         state2.yourPlayerNum = 2;
-        sendToPlayer(opponentId, state2);
+        sendToPlayer(opponentId, 'game_start', state2);
 
-        console.log(`🎮 Игра ${game.id}: ${players[playerId].name} vs ${players[opponentId].name}`);
-
+        console.log(`🎮 Igra ${game.id}: ${players[playerId].name} vs ${players[opponentId].name}`);
     } else {
-        // Nema protivnika, dodaj u red čekanja
-        matchmaking.push(playerId);
-        sendToPlayer(playerId, {
-            type: 'finding_game',
+        matchmaking.add(playerId);
+        socket.emit('finding_game', {
             message: 'Тражим противника... Само тренутак.',
-            queuePosition: matchmaking.length
+            queuePosition: matchmaking.size
         });
-        console.log(`⏳ ${player.name || playerId.substring(0,8)} чека противника (ред: ${matchmaking.length})`);
+        console.log(`⏳ ${player.name || playerId.substring(0,8)} čeka protivnika (red: ${matchmaking.size})`);
     }
 }
 
-function handleCancelFind(playerId) {
-    const index = matchmaking.indexOf(playerId);
-    if (index >= 0) {
-        matchmaking.splice(index, 1);
-        sendToPlayer(playerId, {
-            type: 'find_cancelled',
-            message: 'Претрага отказана.'
-        });
+function handleCancelFind(socket, playerId) {
+    if (matchmaking.has(playerId)) {
+        matchmaking.delete(playerId);
+        socket.emit('find_cancelled', { message: 'Претрага отказана.' });
     }
 }
 
-function handlePlaceTiles(playerId, placements) {
+function handlePlaceTiles(socket, playerId, placements) {
     const player = players[playerId];
     if (!player || !player.gameId) {
-        sendToPlayer(playerId, { type: 'error', message: 'Ниси у игри.' });
+        socket.emit('error', { message: 'Ниси у игри.' });
         return;
     }
-
     const game = games[player.gameId];
     if (!game) {
-        sendToPlayer(playerId, { type: 'error', message: 'Игра не постоји.' });
+        socket.emit('error', { message: 'Игра не постоји.' });
         return;
     }
 
     const result = validateMove(game, playerId, placements);
-
     if (!result.valid) {
-        sendToPlayer(playerId, {
-            type: 'move_invalid',
-            error: result.error
-        });
+        socket.emit('move_invalid', { error: result.error });
         return;
     }
 
-    // Ažuriraj stanje igre
     game.players[playerId].rack = result.newRack;
     game.players[playerId].score += result.score;
     game.isFirstMove = false;
@@ -802,36 +774,27 @@ function handlePlaceTiles(playerId, placements) {
         placements: result.placements
     };
     game.skipCount = 0;
-    game.turnStartTime = Date.now();
 
-    // Promeni redosled
     const opponentId = Object.keys(game.players).find(id => id !== playerId);
     game.currentTurn = opponentId;
 
-    // Proveri kraj igre
     let gameOver = false;
     let winner = null;
-
     if (game.bag.length === 0) {
         const p1Rack = game.players[playerId].rack;
         const p2Rack = game.players[opponentId].rack;
-
         if (p1Rack.length === 0 || p2Rack.length === 0) {
             gameOver = true;
-            // Oduzmi preostale pločice
             let p1Deduction = 0, p2Deduction = 0;
             for (const l of p1Rack) p1Deduction += letterValues[l] || 0;
             for (const l of p2Rack) p2Deduction += letterValues[l] || 0;
             game.players[playerId].score -= p1Deduction;
             game.players[opponentId].score -= p2Deduction;
-
             const p1Score = game.players[playerId].score;
             const p2Score = game.players[opponentId].score;
-
             if (p1Score > p2Score) winner = playerId;
             else if (p2Score > p1Score) winner = opponentId;
             else winner = 'draw';
-
             game.status = 'finished';
             game.winner = winner;
         }
@@ -844,78 +807,51 @@ function handlePlaceTiles(playerId, placements) {
         state.lastMovePlayerName = players[playerId].name;
         state.lastMoveWords = result.words;
         state.lastMoveScore = result.score;
-
         if (gameOver) {
             state.type = 'game_over';
             state.gameOver = true;
-            if (winner === 'draw') {
-                state.resultMessage = '🤝 Нерешено!';
-            } else if (winner === pid) {
-                state.resultMessage = '🎉 Победио/ла си!';
-            } else {
-                state.resultMessage = '😞 Изгубио/ла си.';
-            }
+            if (winner === 'draw') state.resultMessage = '🤝 Нерешено!';
+            else if (winner === pid) state.resultMessage = '🎉 Победио/ла си!';
+            else state.resultMessage = '😞 Изгубио/ла си.';
             state.finalScores = {
                 you: game.players[pid].score,
                 opponent: game.players[opponentId].score
             };
         }
-
-        sendToPlayer(pid, state);
+        sendToPlayer(pid, state.type, state);
     }
 
     console.log(`🎯 Igra ${game.id}: ${players[playerId].name} igra ${result.words.join(', ')} (+${result.score})`);
 }
 
-function handleSkipTurn(playerId) {
+function handleSkipTurn(socket, playerId) {
     const player = players[playerId];
     if (!player || !player.gameId) return;
-
     const game = games[player.gameId];
     if (!game || game.currentTurn !== playerId) return;
 
     const opponentId = Object.keys(game.players).find(id => id !== playerId);
     game.currentTurn = opponentId;
-    game.turnStartTime = Date.now();
-    game.lastMove = {
-        playerId: playerId,
-        words: [],
-        score: 0,
-        skipped: true
-    };
-
-    // Povećaj brojač uzastopnih preskakanja
+    game.lastMove = { playerId: playerId, words: [], score: 0, skipped: true };
     if (!game.skipCount) game.skipCount = 0;
     game.skipCount++;
-    console.log('SKIP COUNT SADA:', game.skipCount);
 
-    // Proveri da li je dostignuto 4 uzastopna preskakanja
     let gameOver = false;
     let winner = null;
-
     if (game.skipCount >= 4) {
         gameOver = true;
-        
-        // Oduzmi vrednost preostalih pločica od skora oba igrača
         const p1Rack = game.players[playerId].rack;
         const p2Rack = game.players[opponentId].rack;
-        
-        let p1Deduction = 0;
-        let p2Deduction = 0;
-        
+        let p1Deduction = 0, p2Deduction = 0;
         for (const l of p1Rack) p1Deduction += letterValues[l] || 0;
         for (const l of p2Rack) p2Deduction += letterValues[l] || 0;
-        
         game.players[playerId].score -= p1Deduction;
         game.players[opponentId].score -= p2Deduction;
-        
         const p1Score = game.players[playerId].score;
         const p2Score = game.players[opponentId].score;
-        
         if (p1Score > p2Score) winner = playerId;
         else if (p2Score > p1Score) winner = opponentId;
         else winner = 'draw';
-        
         game.status = 'finished';
         game.winner = winner;
     }
@@ -924,49 +860,41 @@ function handleSkipTurn(playerId) {
         const state = getGameState(game, pid);
         state.type = gameOver ? 'game_over' : 'turn_skipped';
         state.skippedByName = players[playerId].name;
-        
         if (gameOver) {
             state.gameOver = true;
-            state.resultMessage = winner === 'draw' 
-                ? '🤝 Нерешено! Оба играча су прескочила 4 пута.' 
-                : winner === pid 
-                    ? '🎉 Победио/ла си! Противник је прескочио превише пута.' 
+            state.resultMessage = winner === 'draw'
+                ? '🤝 Нерешено! Оба играча су прескочила 4 пута.'
+                : winner === pid
+                    ? '🎉 Победио/ла си! Противник је прескочио превише пута.'
                     : '😞 Изгубио/ла си. Превише прескакања.';
             state.finalScores = {
                 you: game.players[pid].score,
                 opponent: game.players[opponentId].score
             };
         }
-        
-        sendToPlayer(pid, state);
+        sendToPlayer(pid, state.type, state);
     }
-
     console.log(`⏭ Igra ${game.id}: ${players[playerId].name} preskače (skip ${game.skipCount}/4)`);
 }
 
-function handleGetState(playerId) {
+function handleGetState(socket, playerId) {
     const player = players[playerId];
     if (!player || !player.gameId) {
-        sendToPlayer(playerId, { type: 'error', message: 'Ниси у игри.' });
+        socket.emit('error', { message: 'Ниси у игри.' });
         return;
     }
-
     const game = games[player.gameId];
-    if (!game) {
-        sendToPlayer(playerId, { type: 'error', message: 'Игра не постоји.' });
-        return;
-    }
-
+    if (!game) return;
     const state = getGameState(game, playerId);
     state.type = 'game_state';
-    state.opponentName = players[Object.keys(game.players).find(id => id !== playerId)]?.name || 'Противник';
-    sendToPlayer(playerId, state);
+    const opponentId = Object.keys(game.players).find(id => id !== playerId);
+    state.opponentName = players[opponentId]?.name || 'Противник';
+    socket.emit('game_state', state);
 }
 
-function handleResign(playerId) {
+function handleResign(socket, playerId) {
     const player = players[playerId];
     if (!player || !player.gameId) return;
-
     const game = games[player.gameId];
     if (!game || game.status !== 'active') return;
 
@@ -979,197 +907,167 @@ function handleResign(playerId) {
         state.type = 'game_over';
         state.gameOver = true;
         state.resignedByName = players[playerId].name;
-        state.resultMessage = pid === opponentId ? '🎉 Противник је одустао! Победио/ла си!' : '🏳 Предао/ла си се.';
-        sendToPlayer(pid, state);
+        state.resultMessage = pid === opponentId
+            ? '🎉 Противник је одустао! Победио/ла си!'
+            : '🏳 Предао/ла си се.';
+        sendToPlayer(pid, 'game_over', state);
     }
-
     console.log(`🏳 Igra ${game.id}: ${players[playerId].name} predaje`);
 }
 
-function handleChat(playerId, text) {
+function handleChat(socket, playerId, text) {
     const player = players[playerId];
     if (!player || !player.gameId) return;
-
     const game = games[player.gameId];
     if (!game) return;
 
-    broadcastToGame(player.gameId, {
-        type: 'chat_message',
+    io.to(game.id).emit('chat_message', {
         from: player.name,
         fromId: playerId,
-        text: text.substring(0, 200), // max 200 karaktera
+        text: text.substring(0, 200),
         timestamp: Date.now()
     });
 }
 
-function handleRematchRequest(playerId) {
+function handleRematchRequest(socket, playerId) {
     const player = players[playerId];
     if (!player || !player.gameId) return;
     const game = games[player.gameId];
     if (!game || game.status !== 'finished') return;
-    
+
     const opponentId = Object.keys(game.players).find(id => id !== playerId);
     if (!opponentId || !players[opponentId]) return;
-    
-    // Pošalji zahtev protivniku
-    sendToPlayer(opponentId, {
-        type: 'rematch_request',
+
+    sendToPlayer(opponentId, 'rematch_request', {
         fromId: playerId,
         fromName: player.name,
         message: `${player.name} жели реванш!`
     });
-    
-    sendToPlayer(playerId, {
-        type: 'rematch_sent',
-        message: 'Захтев за реванш је послат.'
-    });
-    
+    socket.emit('rematch_sent', { message: 'Захтев за реванш је послат.' });
     console.log(`🔄 ${player.name} traži revanš od ${players[opponentId].name}`);
 }
 
-function handleAcceptRematch(playerId, fromId) {
+function handleAcceptRematch(socket, playerId, fromId) {
     const player = players[playerId];
     if (!player) return;
-    
     const opponent = players[fromId];
     if (!opponent || !opponent.gameId) {
-        sendToPlayer(playerId, { type: 'error', message: 'Противник више није доступан.' });
+        socket.emit('error', { message: 'Противник више није доступан.' });
         return;
     }
-    
     const oldGame = games[opponent.gameId];
     if (!oldGame || oldGame.status !== 'finished') return;
-    
-    // Kreiraj novu igru
+
     const newGame = createGame(fromId, playerId);
-    const gameState1 = getGameState(newGame, fromId);
-    const gameState2 = getGameState(newGame, playerId);
-    
-    sendToPlayer(fromId, {
-        ...gameState1,
-        type: 'game_start',
-        opponentName: player.name,
-        yourPlayerNum: 1,
-        isRematch: true
-    });
-    
-    sendToPlayer(playerId, {
-        ...gameState2,
-        type: 'rematch_accepted',
-        opponentName: opponent.name,
-        yourPlayerNum: 2
-    });
-    
-    // Odmah pošalji i game_start
-    setTimeout(() => {
-        sendToPlayer(playerId, {
-            ...gameState2,
-            type: 'game_start',
-            opponentName: opponent.name,
-            yourPlayerNum: 2,
-            isRematch: true
-        });
-    }, 200);
-    
+    const state1 = getGameState(newGame, fromId);
+    state1.type = 'game_start';
+    state1.opponentName = player.name;
+    state1.yourPlayerNum = 1;
+    state1.isRematch = true;
+    sendToPlayer(fromId, 'game_start', state1);
+
+    const state2 = getGameState(newGame, playerId);
+    state2.type = 'game_start';
+    state2.opponentName = opponent.name;
+    state2.yourPlayerNum = 2;
+    state2.isRematch = true;
+    sendToPlayer(playerId, 'game_start', state2);
+
     delete games[oldGame.id];
     console.log(`🔄 Revanš prihvaćen: ${newGame.id}`);
 }
 
-function handleDeclineRematch(playerId, fromId) {
+function handleDeclineRematch(socket, playerId, fromId) {
     const opponent = players[fromId];
     if (!opponent) return;
-    
-    sendToPlayer(fromId, {
-        type: 'rematch_declined',
-        message: `${players[playerId].name} је одбио реванш.`
-    });
-    
-    sendToPlayer(playerId, {
-        type: 'rematch_declined',
-        message: 'Одбио/ла си реванш.'
-    });
-    
+    sendToPlayer(fromId, 'rematch_declined', { message: `${players[playerId].name} је одбио реванш.` });
+    socket.emit('rematch_declined', { message: 'Одбио/ла си реванш.' });
     console.log(`❌ ${players[playerId].name} odbija revanš`);
 }
 
-function handleDisconnect(playerId) {
-    const player = players[playerId];
-    if (!player) return;
-
-    // Ukloni iz matchmaking-a
-    const mmIndex = matchmaking.indexOf(playerId);
-    if (mmIndex >= 0) matchmaking.splice(mmIndex, 1);
-
-    // Ako je u igri
-    if (player.gameId) {
-        const game = games[player.gameId];
-        if (game && game.status === 'active') {
-            const opponentId = Object.keys(game.players).find(id => id !== playerId);
-            game.status = 'finished';
-            game.winner = opponentId;
-
-            sendToPlayer(opponentId, {
-                type: 'game_over',
-                gameOver: true,
-                resultMessage: '🎉 Противник је искључен. Победио/ла си!',
-                opponentDisconnected: true
-            });
-
-            console.log(`🔌 Igra ${game.id} prekinuta — igrač se isključio`);
-        }
-    }
-}
-function handleLeaveGame(playerId) {
+function handleLeaveGame(socket, playerId) {
     const player = players[playerId];
     if (!player || !player.gameId) return;
-    
     const game = games[player.gameId];
     if (!game) return;
-    
+
     const opponentId = Object.keys(game.players).find(id => id !== playerId);
-    
-    // Obavesti protivnika da je igrač otišao
-    sendToPlayer(opponentId, {
-        type: 'opponent_left',
-        message: `${player.name} је напустио игру.`
-    });
-    
-    // Ukloni igru
+    // Obavesti protivnika
+    if (opponentId && players[opponentId]) {
+        sendToPlayer(opponentId, 'opponent_left', { message: `${player.name} је напустио игру.` });
+    }
+
+    // Očisti sobu iz socket
+    socket.leave(game.id);
     delete games[game.id];
-    
-    // Očisti igrače
     players[playerId].gameId = null;
     players[playerId].playerNum = null;
     if (players[opponentId]) {
         players[opponentId].gameId = null;
         players[opponentId].playerNum = null;
+        if (players[opponentId].socket) players[opponentId].socket.leave(game.id);
     }
-    
     console.log(`🚪 ${player.name} napušta igru ${game.id}`);
 }
 
-// ==================== PERIODIČNO ČIŠĆENJE ====================
+// ==================== DISCONNECT SA GRACE PERIODOM ====================
+function handleDisconnect(socket, playerId) {
+    const player = players[playerId];
+    if (!player) return;
+
+    console.log(`🔌 Socket disconnected: ${socket.id} (playerId: ${playerId.substring(0,8)})`);
+
+    // Ukloni iz matchmaking-a odmah
+    if (matchmaking.has(playerId)) {
+        matchmaking.delete(playerId);
+        console.log(`🔴 Igrač ${playerId.substring(0,8)} uklonjen iz reda zbog diskonekcije.`);
+    }
+
+    // Ako je u aktivnoj igri, pokreni tajmer
+    if (player.gameId) {
+        const game = games[player.gameId];
+        if (game && game.status === 'active') {
+            console.log(`⏳ Igrač ${playerId.substring(0,8)} diskonektovan iz aktivne igre. Čekam ${DISCONNECT_GRACE_MS/1000}s pre predaje...`);
+            player.disconnectTimer = setTimeout(() => {
+                console.log(`⏰ Vreme isteklo, automatska predaja igrača ${playerId.substring(0,8)}`);
+                // Ako se igrač nije vratio, proglasi predaju
+                if (players[playerId] && players[playerId].gameId === player.gameId) {
+                    handleResign(null, playerId);
+                }
+            }, DISCONNECT_GRACE_MS);
+        }
+    }
+
+    // Postavi socket na null da znamo da je offline (ali zadržavamo player objekat)
+    player.socket = null;
+}
+
+// ==================== ČIŠĆENJE ====================
 setInterval(() => {
     const now = Date.now();
-    const timeout = 30 * 60 * 1000; // 30 minuta
-
     for (const [gameId, game] of Object.entries(games)) {
-        // Očisti završene igre starije od 30 min
-        if (game.status === 'finished' && now - game.createdAt > timeout) {
+        if (game.status === 'finished' && now - game.createdAt > 30 * 60 * 1000) {
             delete games[gameId];
             console.log(`🧹 Očišćena igra ${gameId}`);
         }
     }
-}, 5 * 60 * 1000); // Svakih 5 minuta
+    // Očisti i sobe starije od 10 min
+    for (const [link, room] of Object.entries(rooms)) {
+        if (now - room.createdAt > 10 * 60 * 1000) {
+            delete rooms[link];
+            console.log(`🧹 Očišćena soba ${link}`);
+        }
+    }
+}, CLEANUP_INTERVAL_MS);
 
 // ==================== POKRETANJE ====================
-server.listen(PORT, () => {
+httpServer.listen(PORT, () => {
     console.log('═══════════════════════════════════════════');
-    console.log('🎯 СМЕХАЛИЦА УКРШТЕНИЦА - СЕРВЕР');
+    console.log('🎯 СМЕХАЛИЦА УКРШТЕНИЦА - СЕРВЕР (Socket.IO)');
     console.log('═══════════════════════════════════════════');
     console.log(`🚀 Server pokrenut na portu ${PORT}`);
     console.log(`📚 Rečnik: ${DICTIONARY.size} reči`);
-    console.log(`🔌 WebSocket: ws://localhost:${PORT}`);
+    console.log(`🔌 Socket.IO: ws://localhost:${PORT}`);
     console.log(`🌐 HTTP: http://localhost:${PORT}`);
     console.log('═══════════════════════════════════════════');
 });
