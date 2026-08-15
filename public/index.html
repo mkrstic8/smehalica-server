@@ -224,11 +224,55 @@
             <button class="btn-info" onclick="showJoinRoom()" style="width:100%;padding:12px;margin-bottom:8px;">
                 🔗 ПРИДРУЖИ СЕ СОБИ
             </button>
+            <button class="btn-secondary" onclick="showRules()" style="width:100%;padding:12px;margin-bottom:8px;">
+                📜 ПРАВИЛА
+            </button>
             <button class="btn-secondary" onclick="goBackToName()" style="width:100%;padding:12px;">
                 ↩ НАЗАД
             </button>
         </div>
-        
+        <div class="overlay-content" id="rulesScreen" style="display:none; max-width: 500px; max-height: 80vh; overflow-y: auto; text-align: left;">
+            <h2 style="text-align:center;">📜 Правила игре</h2>
+            <p style="font-size:0.85rem; line-height:1.6; margin-bottom:15px;">
+                Помаже Бог драги играчи, љубитељи српског језика и ћирилице!
+            </p>
+            <p style="font-size:0.85rem; line-height:1.6; margin-bottom:15px;">
+                <strong>Правила игре:</strong> Ово је игра за 2 играча где сваки играч насумично ставља по једну реч на таблу. Реч може да се стави положено или усправно, и треба искористити бар једно слово са табле осим у првом потезу првог играча.
+            </p>
+            <p style="font-size:0.85rem; line-height:1.6; margin-bottom:15px;">
+                На почетку први играч на празну таблу ставља реч која мора ићи преко средине, преко поља звезда.
+            </p>
+            <p style="font-size:0.85rem; line-height:1.6; margin-bottom:15px;">
+                Свако бонус поље вреди само једном. Средишње поље у облику звезде дуплира први постављену реч. Зелено поље удвостручује вредност слова, а плаво га утростручује. Жуто поље удвостручује вредност целе речи а црвено га утростручује. Кад је ваш потез можете мешати слова из руке или прескочити потез.
+            </p>
+            <p style="font-size:0.85rem; line-height:1.6; margin-bottom:15px;">
+                Потрошена слова се опет извлаче из врећице након завршетка потеза.
+            </p>
+            <p style="font-size:0.85rem; line-height:1.6; margin-bottom:15px;">
+                <strong>Завршетак игре:</strong> Игра се може завршити на три начина:
+            </p>
+            <p style="font-size:0.85rem; line-height:1.6; margin-bottom:15px;">
+                1) Када се извуку сва слова из врећице и један играч потроши сва слова из руке. Тада се њему додају бодови противничких слова из руке а противнику се ти поени одузимају.
+            </p>
+            <p style="font-size:0.85rem; line-height:1.6; margin-bottom:15px;">
+                2) Предаја једног од противника.
+            </p>
+            <p style="font-size:0.85rem; line-height:1.6; margin-bottom:15px;">
+                3) Када потез буде прескочен четири пута узастопно, игра се прекида и победник је онај који има више поена, а поени из руке се сваком играчу одузимају од укупног броја поена.
+            </p>
+            <p style="font-size:0.85rem; line-height:1.6; margin-bottom:15px;">
+                <strong>Начини играња:</strong> Можете играти брзу игру против насумичног противника, креирати собу у коју ће ући ваш пријатељ или продужити се соби пријатеља. Постоји и опција за реванш.
+            </p>
+            <p style="font-size:0.85rem; line-height:1.6; margin-bottom:15px;">
+                <strong>Савет:</strong> Када стављате слова на таблу и формирате главну реч, водите рачуна да могу да постану више речи те да свака има смисла у српском језику. Поени се добијају за све формиране речи. Речи су исправне ако имају смисла са лева на десно или одозго на доле.
+            </p>
+            <p style="font-size:0.85rem; line-height:1.6; font-weight:bold; text-align:center;">
+                Срећно играње!
+            </p>
+            <button class="btn-secondary" onclick="hideRules()" style="width:100%;padding:12px;margin-top:10px;">
+                ↩ НАЗАД
+            </button>
+        </div>        
         <div class="overlay-content" id="createRoomScreen" style="display:none;">
             <h2>🏠 Нова соба</h2>
             <p id="roomLinkDisplay" style="font-size:1.5rem;color:#FFD700;letter-spacing:3px;margin:15px 0;">----</p>
@@ -519,7 +563,15 @@
         };
         let waitingRack = [];
         let myRoomLink = null;
-
+        function showRules() {
+            document.getElementById('optionsScreen').style.display = 'none';
+            document.getElementById('rulesScreen').style.display = 'block';
+        }
+        
+        function hideRules() {
+            document.getElementById('rulesScreen').style.display = 'none';
+            document.getElementById('optionsScreen').style.display = 'block';
+        }
         function showGameOptions() {
             myName = document.getElementById('nameInput').value.trim() || 'Играч';
             sendMessage({ type: 'set_name', name: myName });
@@ -529,9 +581,9 @@
         
         function goBackToName() {
             document.getElementById('optionsScreen').style.display = 'none';
+            document.getElementById('rulesScreen').style.display = 'none';
             document.getElementById('nameScreen').style.display = 'block';
         }
-        
         function goBackToOptions() {
             document.getElementById('joinRoomScreen').style.display = 'none';
             document.getElementById('createRoomScreen').style.display = 'none';
@@ -803,7 +855,7 @@
 
         function cancelFind() {
             sendMessage({ type: 'cancel_find' });
-            document.getElementById('findingScreen').style.display = 'none';
+            document.getElementById('rulesScreen').style.display = 'none';
             document.getElementById('optionsScreen').style.display = 'block';
             waitingRack = [];
         }
