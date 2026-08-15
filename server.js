@@ -164,7 +164,8 @@ function createGame(player1Id, player2Id) {
         winner: null,
         lastMove: null,
         turnStartTime: Date.now(),
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        skipCount: 0
     };
 
     games[gameId] = game;
@@ -229,7 +230,7 @@ function validateMove(game, playerId, placements) {
         }
         const idx = neededLetters.indexOf(letter);
         if (idx === -1) {
-            return { valid: false, error: `Немаш слово "${letter}" на сталку.` };
+            return { valid: false, error: `Немаш слово "${letter}" на табли.` };
         }
         neededLetters.splice(idx, 1);
         tempBoard.push({ row, col, letter });
@@ -599,7 +600,9 @@ function handleMessage(playerId, message) {
         case 'decline_rematch':
             handleDeclineRematch(playerId, message.fromId);
             break;
-
+        case 'leave_game':
+            handleLeaveGame(playerId);
+            break;
         default:
             console.log('Nepoznat tip poruke:', type);
             sendToPlayer(playerId, { type: 'error', message: 'Nepoznat tip poruke: ' + type });
@@ -750,7 +753,7 @@ function handleFindGame(playerId) {
         matchmaking.push(playerId);
         sendToPlayer(playerId, {
             type: 'finding_game',
-            message: 'Тражим противника... Чека се.',
+            message: 'Тражим противника... Само тренутак.',
             queuePosition: matchmaking.length
         });
         console.log(`⏳ ${player.name || playerId.substring(0,8)} чека противника (ред: ${matchmaking.length})`);
@@ -801,6 +804,7 @@ function handlePlaceTiles(playerId, placements) {
         score: result.score,
         placements: result.placements
     };
+    game.skipCount = 0;
     game.turnStartTime = Date.now();
 
     // Promeni redosled
@@ -883,14 +887,64 @@ function handleSkipTurn(playerId) {
         skipped: true
     };
 
+    // Povećaj brojač uzastopnih preskakanja
+    if (!game.skipCount) game.skipCount = 0;
+    game.skipCount++;
+    console.log('SKIP COUNT SADA:', game.skipCount);
+
+    // Proveri da li je dostignuto 4 uzastopna preskakanja
+    let gameOver = false;
+    let winner = null;
+
+    if (game.skipCount >= 4) {
+        gameOver = true;
+        
+        // Oduzmi vrednost preostalih pločica od skora oba igrača
+        const p1Rack = game.players[playerId].rack;
+        const p2Rack = game.players[opponentId].rack;
+        
+        let p1Deduction = 0;
+        let p2Deduction = 0;
+        
+        for (const l of p1Rack) p1Deduction += letterValues[l] || 0;
+        for (const l of p2Rack) p2Deduction += letterValues[l] || 0;
+        
+        game.players[playerId].score -= p1Deduction;
+        game.players[opponentId].score -= p2Deduction;
+        
+        const p1Score = game.players[playerId].score;
+        const p2Score = game.players[opponentId].score;
+        
+        if (p1Score > p2Score) winner = playerId;
+        else if (p2Score > p1Score) winner = opponentId;
+        else winner = 'draw';
+        
+        game.status = 'finished';
+        game.winner = winner;
+    }
+
     for (const pid of Object.keys(game.players)) {
         const state = getGameState(game, pid);
-        state.type = 'turn_skipped';
+        state.type = gameOver ? 'game_over' : 'turn_skipped';
         state.skippedByName = players[playerId].name;
+        
+        if (gameOver) {
+            state.gameOver = true;
+            state.resultMessage = winner === 'draw' 
+                ? '🤝 Нерешено! Оба играча су прескочила 4 пута.' 
+                : winner === pid 
+                    ? '🎉 Победио/ла си! Противник је прескочио превише пута.' 
+                    : '😞 Изгубио/ла си. Превише прескакања.';
+            state.finalScores = {
+                you: game.players[pid].score,
+                opponent: game.players[opponentId].score
+            };
+        }
+        
         sendToPlayer(pid, state);
     }
 
-    console.log(`⏭ Igra ${game.id}: ${players[playerId].name} preskače`);
+    console.log(`⏭ Igra ${game.id}: ${players[playerId].name} preskače (skip ${game.skipCount}/4)`);
 }
 
 function handleGetState(playerId) {
@@ -1067,6 +1121,34 @@ function handleDisconnect(playerId) {
             console.log(`🔌 Igra ${game.id} prekinuta — igrač se isključio`);
         }
     }
+}
+function handleLeaveGame(playerId) {
+    const player = players[playerId];
+    if (!player || !player.gameId) return;
+    
+    const game = games[player.gameId];
+    if (!game) return;
+    
+    const opponentId = Object.keys(game.players).find(id => id !== playerId);
+    
+    // Obavesti protivnika da je igrač otišao
+    sendToPlayer(opponentId, {
+        type: 'opponent_left',
+        message: `${player.name} је напустио игру.`
+    });
+    
+    // Ukloni igru
+    delete games[game.id];
+    
+    // Očisti igrače
+    players[playerId].gameId = null;
+    players[playerId].playerNum = null;
+    if (players[opponentId]) {
+        players[opponentId].gameId = null;
+        players[opponentId].playerNum = null;
+    }
+    
+    console.log(`🚪 ${player.name} napušta igru ${game.id}`);
 }
 
 // ==================== PERIODIČNO ČIŠĆENJE ====================

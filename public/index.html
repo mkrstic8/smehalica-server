@@ -142,6 +142,15 @@
         .btn-warning{background:#ff9800;color:white}.btn-warning:hover{background:#e68900}
         .btn-info{background:#17a2b8;color:white}.btn-info:hover{background:#138496}
         button:disabled{opacity:0.4;cursor:not-allowed;transform:none!important}
+        .btn-light {
+            background: #ffffff;
+            color: #333;
+            border: 2px solid #ddd;
+        }
+        .btn-light:hover {
+            background: #f0f0f0;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+        }
         .message-box { background: rgba(0,0,0,0.45); padding: 8px 12px; border-radius: 8px; text-align: center; font-size: 0.85rem; min-height: 36px; display: flex; align-items: center; justify-content: center; width: 100%; max-width: 600px; flex-wrap: wrap; gap: 4px; }
         .message-box.error{color:#ff6b6b}.message-box.success{color:#51cf66}.message-box.info{color:#64b5f6}
         .turn-indicator { font-size: 1rem; font-weight: bold; padding: 4px 12px; border-radius: 16px; }
@@ -298,9 +307,9 @@
         <div class="controls">
             <button class="btn-success" id="btnSubmit" onclick="submitMove()">✅ ПОТВРДИ</button>
             <button class="btn-danger" id="btnRecall" onclick="recallTiles()">↩ ВРАТИ</button>
-            <button class="btn-secondary" onclick="shuffleRack()">🔀 МЕШАЈ</button>
+            <button class="btn-secondary" id="btnShuffle" onclick="shuffleRack()">🔀 МЕШАЈ</button>         
             <button class="btn-warning" id="btnSkip" onclick="skipTurn()">⏭ ПРЕСКОЧИ</button>
-            <button class="btn-info" onclick="resignGame()">🏳 ПРЕДАЈА</button>
+            <button class="btn-info" id="btnResign" onclick="resignGame()">🏳 ПРЕДАЈА</button>
         </div>
 
         <div class="chat-area">
@@ -314,8 +323,7 @@
 
     <script>
         // ==================== KONEKCIJA ====================
-        const SERVER_URL = 'wss://smehalica-server.onrender.com';
-        
+        const SERVER_URL = 'wss://smehalica-server.onrender.com';       
         // ==================== AdMob MONETIZACIJA ====================
         const TEST_MODE = true; // ⚠️ Pre objave stavi na false, ali ostavi test ID za sada
         
@@ -364,32 +372,32 @@
         });
 
         // ==================== KEEP-ALIVE (sprečava gašenje) ====================
+         let keepAliveStarted = false;
+        
         function keepAlive() {
-            // Ping svakih 15 sekundi da veza ostane živa
+            if (keepAliveStarted) return;
+            keepAliveStarted = true;
+            
             setInterval(() => {
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     sendMessage({ type: 'ping' });
                 }
             }, 15000);
             
-            // Kada aplikacija pređe u pozadinu, održavaj vezu
             document.addEventListener('visibilitychange', () => {
                 if (document.hidden) {
                     console.log('📱 Aplikacija u pozadini - održavam vezu...');
-                    // Pošalji ping odmah
                     if (ws && ws.readyState === WebSocket.OPEN) {
                         sendMessage({ type: 'ping' });
                     }
                 } else {
                     console.log('📱 Aplikacija ponovo aktivna');
-                    // Osveži stanje
                     if (ws && ws.readyState === WebSocket.OPEN && gameActive) {
                         sendMessage({ type: 'get_state' });
                     }
                 }
             });
         }
-
         // ==================== ZVUCI (Web Audio API) ====================
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         let audioCtx = null;
@@ -647,7 +655,7 @@
                     localStorage.setItem('smehalica_playerId', playerId);
                     break;
                 case 'finding_game':
-                    document.getElementById('findingStatus').textContent = msg.message + (msg.queuePosition ? ` (Позиција #${msg.queuePosition})` : '');
+                    document.getElementById('findingStatus').textContent = msg.message;
                     break;
                 case 'find_cancelled':
                     document.getElementById('findingStatus').textContent = msg.message;
@@ -655,15 +663,42 @@
                     document.getElementById('nameInput').disabled = false;
                     break;
                 case 'game_start':
+                    // Ukloni dugmad za kraj igre
+                    const oldMenuBtn = document.getElementById('menuBtn');
+                    if (oldMenuBtn) oldMenuBtn.remove();
+                    const oldRematchBtn2 = document.getElementById('rematchBtn');
+                    if (oldRematchBtn2) oldRematchBtn2.remove();
+                    
+                    // Vrati originalna dugmad za igru
+                    const buttonsToShow = ['btnSubmit', 'btnRecall', 'btnShuffle', 'btnSkip', 'btnResign'];
+                    buttonsToShow.forEach(btnId => {
+                        const btn = document.getElementById(btnId);
+                        if (btn) btn.style.display = '';
+                    });
+                    
                     startGame(msg);
                     break;
                 case 'move_result':
                     updateGameState(msg);
                     if (msg.lastMoveWords && msg.lastMoveWords.length > 0) {
                         const isMyMove = msg.lastMovePlayerName === myName;
+                        
+                        // Pronađi poslednje postavljeno slovo iz placements
+                        if (msg.lastMove && msg.lastMove.placements && msg.lastMove.placements.length > 0) {
+                            const lastPlacement = msg.lastMove.placements[msg.lastMove.placements.length - 1];
+                            
+                            // Osveli poslednje slovo crveno KOD OBA IGRČA
+                            const lastCell = document.querySelector(`.cell[data-row="${lastPlacement.row}"][data-col="${lastPlacement.col}"]`);
+                            if (lastCell) {
+                                lastCell.classList.add('last-letter-red');
+                                setTimeout(() => {
+                                    lastCell.classList.remove('last-letter-red');
+                                }, 2500);
+                            }
+                        }
+                        
                         if (isMyMove) {
                             sfxValid();
-                            // Animacije za moja slova
                             if (msg.lastMove && msg.lastMove.placements) {
                                 msg.lastMove.placements.forEach(p => {
                                     animateCell(p.row, p.col, 'bounce');
@@ -685,7 +720,7 @@
                     sfxInvalid();
                     // Shake animacija na novopostavljenim ćelijama
                     newlyPlacedCells.forEach(p => animateCell(p.row, p.col, 'shake'));
-                    alert('❌ Неважећи потез: ' + msg.error);
+                    errorMsg('❌ Неважећи потез: ' + msg.error);
                     requestStateFromServer();
                     break;
                 case 'turn_skipped':
@@ -716,11 +751,13 @@
                 case 'rematch_accepted':
                     hideRematchRequest();
                     addChatSystemMsg('🔄 Реванш прихваћен! Нова игра почиње.');
+                    removeRematchButton();
                     break;
                 case 'rematch_declined':
                     hideRematchRequest();
                     addChatSystemMsg('❌ Реванш одбијен.');
-                    setMessage('❌ Противник је одбио реванш.', 'info');
+                    setMessage('❌ Противник је одбио реванш.', 'info', 3000);
+                    removeRematchButton();
                     break;
                                     case 'room_created':
                     myRoomLink = msg.roomLink;
@@ -731,7 +768,27 @@
                 case 'room_link':
                     myRoomLink = msg.roomLink;
                     break;
-            }
+                case 'opponent_left':
+                    // Protivnik je otišao — ukloni dugmad za revanš
+                    removeRematchButton();
+                    const oldMenuBtn3 = document.getElementById('menuBtn');
+                    if (oldMenuBtn3) oldMenuBtn3.remove();
+                    
+                    // Prikaži dugme za početni meni
+                    const controls = document.querySelector('.controls');
+                    let menuBtn2 = document.getElementById('menuBtn');
+                    if (!menuBtn2) {
+                        menuBtn2 = document.createElement('button');
+                        menuBtn2.id = 'menuBtn';
+                        menuBtn2.className = 'btn-light';
+                        menuBtn2.textContent = '🏠 POČETNI MENI';
+                        menuBtn2.onclick = () => goToMainMenu();
+                        controls.appendChild(menuBtn2);
+                    }
+                    
+                    permanentMsg('🚪 Противник је напустио игру.');
+                    break;
+        }
         }
 
         function requestStateFromServer() {
@@ -760,7 +817,7 @@
             document.getElementById('yourNameLabel').textContent = '👤 Ти';
             document.getElementById('opponentNameLabel').textContent = '🤖 ' + msg.opponentName;
             updateGameState(msg);
-            setMessage('🎮 Игра почиње! ' + (msg.isYourTurn ? 'Ти си на потезу.' : 'Противник је на потезу.'), 'info');
+            setMessage('🎮 Игра почиње! ' + (msg.isYourTurn ? 'Ти си на потезу.' : 'Противник је на потезу.'), 'info', 3000);
             highlightRack();
         }
 
@@ -775,6 +832,8 @@
                 updateTurnIndicator(msg.isYourTurn);
                 document.getElementById('btnSubmit').disabled = !isMyTurn;
                 document.getElementById('btnSkip').disabled = !isMyTurn;
+                document.getElementById('btnRecall').disabled = !isMyTurn;
+
             }
             if (msg.gameOver) {
                 gameIsOver = true;
@@ -909,14 +968,28 @@
                 oBox.classList.add('active-player');
             }
         }
-
-        function setMessage(msg, type) {
+        let messageTimeout = null;
+        
+        function setMessage(msg, type, duration = 3000) {
             const el = document.getElementById('message');
             el.textContent = msg;
             el.className = 'message-box';
             if (type) el.classList.add(type);
+            
+            if (messageTimeout) clearTimeout(messageTimeout);
+            
+            if (duration > 0) {
+                messageTimeout = setTimeout(() => {
+                    el.textContent = '';
+                    el.className = 'message-box';
+                }, duration);
+            }
         }
-
+        
+        function quickMsg(msg) { setMessage(msg, '', 1500); }
+        function successMsg(msg) { setMessage(msg, 'success', 3000); }
+        function errorMsg(msg) { setMessage(msg, 'error', 3000); }
+        function permanentMsg(msg, type = 'info') { setMessage(msg, type, 0); }
         // ==================== INTERAKCIJE ====================
         function onRackClick(index) {
             if (!isMyTurn || !gameActive || gameIsOver) return;
@@ -941,12 +1014,12 @@
                         newlyPlacedCells.splice(existingIdx, 1);
                         renderBoardFromState(boardState);
                         renderMyRack();
-                        setMessage('↩ Плочица враћена на сталак.', '');
+                        quickMsg('↩ Плочица враћена на таблу.');
                     }
                 } else if (isOccupiedPermanently) {
-                    setMessage('⚠ То поље је већ заузето.', 'error');
+                    errorMsg('⚠ То поље је већ заузето.');
                 } else {
-                    setMessage('👆 Прво изабери плочицу са сталке!', 'error');
+                    errorMsg('👆 Прво изабери плочицу са табле!');
                 }
                 return;
             }
@@ -969,13 +1042,13 @@
             renderMyRack();
             sfxPlace();
             animateCell(row, col, 'bounce');
-            setMessage(`✅ Постављено "${letter}" (${letterValues[letter] || 0} поен${letterValues[letter] === 1 ? '' : 'а'}).`, 'success');
+            quickMsg(`✅ Постављено "${letter}" (${letterValues[letter] || 0} поен${letterValues[letter] === 1 ? '' : 'а'}).`);
         }
 
         function recallTiles() {
             if (!isMyTurn || !gameActive || gameIsOver) return;
             if (newlyPlacedCells.length === 0) {
-                setMessage('ℹ Нема новопостављених плочица.', '');
+                quickMsg('ℹ Нема новопостављених плочица.');
                 return;
             }
             for (const p of [...newlyPlacedCells]) myRack.push(p.letter);
@@ -983,31 +1056,31 @@
             selectedTileIndex = null;
             renderBoardFromState(currentBoardState);
             renderMyRack();
-            setMessage('↩ Све плочице враћене на сталак.', '');
+            quickMsg('↩ Све плочице враћене на таблу.');
         }
 
         function shuffleRack() {
-            if (!isMyTurn || !gameActive || gameIsOver) return;
+            if (!gameActive || gameIsOver) return;
             for (let i = myRack.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [myRack[i], myRack[j]] = [myRack[j], myRack[i]];
             }
             selectedTileIndex = null;
             renderMyRack();
-            setMessage('🔀 Плочице промешане.', '');
+            quickMsg('🔀 Плочице промешане.');
         }
 
         function submitMove() {
             if (!isMyTurn || !gameActive || gameIsOver) return;
             if (newlyPlacedCells.length === 0) {
-                setMessage('⚠ Постави бар једно слово на таблу!', 'error');
+                errorMsg('⚠ Постави бар једно слово на таблу!');
                 return;
             }
             const placements = newlyPlacedCells.map(p => ({ row: p.row, col: p.col, letter: p.letter }));
             sendMessage({ type: 'place_tiles', placements: placements });
             newlyPlacedCells = [];
             selectedTileIndex = null;
-            setMessage('⏳ Шаљем потез на проверу...', 'info');
+            permanentMessage('⏳ Шаљем потез на проверу...', 'info');
         }
 
         function skipTurn() {
@@ -1017,7 +1090,7 @@
                 recallTiles();
             }
             sendMessage({ type: 'skip_turn' });
-            setMessage('⏭ Прескачеш потез...', 'info');
+            setMessage('⏭ Прескачеш потез...', 'info', 2000);
         }
 
         function resignGame() {
@@ -1029,22 +1102,71 @@
                     showInterstitial();
                             }, 300);
         }
-
+        function removeRematchButton() {
+            const btn = document.getElementById('rematchBtn');
+            if (btn) {
+                btn.remove();
+            }
+        }
+        function goToMainMenu() {
+            // Obavesti server da napuštaš igru (bez revanša)
+            sendMessage({ type: 'leave_game' });
+            
+            // Ukloni dugmad za kraj igre
+            const rematchBtn = document.getElementById('rematchBtn');
+            const menuBtn = document.getElementById('menuBtn');
+            if (rematchBtn) rematchBtn.remove();
+            if (menuBtn) menuBtn.remove();
+            
+            // Vrati originalna dugmad
+            const buttonsToShow = ['btnSubmit', 'btnRecall', 'btnShuffle', 'btnSkip', 'btnResign'];
+            buttonsToShow.forEach(btnId => {
+                const btn = document.getElementById(btnId);
+                if (btn) btn.style.display = '';
+            });
+            
+            // Resetuj stanje
+            gameActive = false;
+            gameIsOver = false;
+            myRack = [];
+            newlyPlacedCells = [];
+            selectedTileIndex = null;
+            
+            document.getElementById('gameContainer').style.display = 'none';
+            document.getElementById('nameOverlay').style.display = 'flex';
+            document.getElementById('optionsScreen').style.display = 'block';
+            document.getElementById('nameScreen').style.display = 'none';
+            document.getElementById('createRoomScreen').style.display = 'none';
+            document.getElementById('joinRoomScreen').style.display = 'none';
+            document.getElementById('findingScreen').style.display = 'none';
+        }
         function showGameOver(msg) {
             gameActive = false;
             gameIsOver = true;
-            document.getElementById('btnSubmit').disabled = true;
-            document.getElementById('btnSkip').disabled = true;
-            document.getElementById('btnRecall').disabled = true;
             updateTurnIndicator(false);
-            setMessage('🏁 ' + (msg.resultMessage || 'Игра је завршена.'), 'info');
-            
-            // ⭐ PRIKAŽI INTERSTITIAL POSLE GAME OVER
-            setTimeout(() => {
-                showInterstitial();
-            }, 1500);
+            permanentMsg('🏁 ' + (msg.resultMessage || 'Игра је завршена.'));
             
             const controls = document.querySelector('.controls');
+            
+            // Sakrij sva postojeća dugmad
+            const buttonsToHide = ['btnSubmit', 'btnRecall', 'btnShuffle', 'btnSkip', 'btnResign'];
+            buttonsToHide.forEach(btnId => {
+                const btn = document.getElementById(btnId);
+                if (btn) btn.style.display = 'none';
+            });
+            
+            // Dodaj belo dugme za meni
+            let menuBtn = document.getElementById('menuBtn');
+            if (!menuBtn) {
+                menuBtn = document.createElement('button');
+                menuBtn.id = 'menuBtn';
+                menuBtn.className = 'btn-light';
+                menuBtn.textContent = '🏠 POČETNI MENI';
+                menuBtn.onclick = () => goToMainMenu();
+                controls.appendChild(menuBtn);
+            }
+            
+            // Dodaj žuto dugme za revanš
             let rematchBtn = document.getElementById('rematchBtn');
             if (!rematchBtn) {
                 rematchBtn = document.createElement('button');
@@ -1060,7 +1182,6 @@
                 controls.appendChild(rematchBtn);
             }
         }
-
         function showRematchRequest(msg) {
             hideRematchRequest();
             const overlay = document.createElement('div');
@@ -1078,7 +1199,7 @@
             document.getElementById('acceptRematchBtn').onclick = () => {
                 sendMessage({ type: 'accept_rematch', fromId: msg.fromId });
                 hideRematchRequest();
-                setMessage('🔄 Реванш прихваћен!', 'success');
+                successMsg('🔄 Реванш прихваћен!');
             };
             document.getElementById('declineRematchBtn').onclick = () => {
                 sendMessage({ type: 'decline_rematch', fromId: msg.fromId });
