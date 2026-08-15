@@ -590,9 +590,8 @@
             hideRematchRequest();
             addChatSystemMsg('❌ Реванш одбијен.');
             setMessage('❌ Противник је одбио реванш.', 'info', 3000);
-            removeRematchButton();
+            removeRematchButton(); // уклања се реванш, остаје menuBtn
         });
-
         socket.on('rematch_sent', (msg) => {
             setMessage(msg.message, 'info', 2000);
         });
@@ -704,10 +703,13 @@
         }
 
         function startGame(msg) {
-            // Ukloni zaostale dinamičke dugmiće iz prethodne igre
+        // Уклони заостале динамичке дугмиће из претходне игре
             removeRematchButton();
             const oldMenuBtn = document.getElementById('menuBtn');
             if (oldMenuBtn) oldMenuBtn.remove();
+            
+            // Врати сва акциона дугмад
+            showAllActionButtons();
             
             showScreen('game');
             // ... ostatak postojeće funkcije
@@ -1004,29 +1006,42 @@
 
         function goToMainMenu() {
             sendMessage('leave_game');
-            const rematchBtn = document.getElementById('rematchBtn');
+            
+            removeRematchButton();
             const menuBtn = document.getElementById('menuBtn');
-            if (rematchBtn) rematchBtn.remove();
             if (menuBtn) menuBtn.remove();
-            const buttonsToShow = ['btnSubmit', 'btnRecall', 'btnShuffle', 'btnSkip', 'btnResign'];
-            buttonsToShow.forEach(btnId => {
-                const btn = document.getElementById(btnId);
-                if (btn) btn.style.display = '';
-            });
+            
+            // Врати акциона дугмад пре одласка у мени
+            showAllActionButtons();
+            
             gameActive = false;
             gameIsOver = false;
             myRack = [];
             newlyPlacedCells = [];
             selectedTileIndex = null;
+            
             showScreen('optionsScreen');
         }
+        function hideAllActionButtons() {
+            ['btnSubmit', 'btnRecall', 'btnShuffle', 'btnSkip', 'btnResign'].forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) btn.style.display = 'none';
+            });
+        }
 
+        function showAllActionButtons() {
+            ['btnSubmit', 'btnRecall', 'btnShuffle', 'btnSkip', 'btnResign'].forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) btn.style.display = '';
+            });
+        }
         function showGameOver(msg) {
             gameActive = false;
             gameIsOver = true;
-            document.getElementById('btnSubmit').disabled = true;
-            document.getElementById('btnSkip').disabled = true;
-            document.getElementById('btnRecall').disabled = true;
+
+            // Сакриј сва акциона дугмад
+            hideAllActionButtons();
+
             updateTurnIndicator(false);
             setMessage('🏁 ' + (msg.resultMessage || 'Игра је завршена.'), 'info', 0);
             
@@ -1036,13 +1051,13 @@
             
             const controls = document.querySelector('.controls');
             
-            // Prvo ukloni sve dinamičke dugmiće (ako postoje)
+            // Уклони постојеће динамичке дугмиће ако постоје
             removeRematchButton();
             const oldMenuBtn = document.getElementById('menuBtn');
             if (oldMenuBtn) oldMenuBtn.remove();
             
-            // Dodaj dugme za revanš
-            let rematchBtn = document.createElement('button');
+            // Додај дугме за реванш
+            const rematchBtn = document.createElement('button');
             rematchBtn.id = 'rematchBtn';
             rematchBtn.className = 'btn-primary';
             rematchBtn.textContent = '🔄 ПОНУДИ РЕВАНШ';
@@ -1054,8 +1069,8 @@
             };
             controls.appendChild(rematchBtn);
             
-            // Dodaj dugme za početni meni
-            let menuBtn = document.createElement('button');
+            // Додај дугме за почетни мени
+            const menuBtn = document.createElement('button');
             menuBtn.id = 'menuBtn';
             menuBtn.className = 'btn-light';
             menuBtn.textContent = '🏠 ПОЧЕТНИ МЕНИ';
