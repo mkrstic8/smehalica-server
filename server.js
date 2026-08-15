@@ -206,7 +206,7 @@ function getGameState(game, playerId) {
     };
 }
 
-// ==================== VALIDACIJA POTEZA (isto kao i pre) ====================
+// ==================== VALIDACIJA POTEZA ====================
 function validateMove(game, playerId, placements) {
     if (game.currentTurn !== playerId) {
         return { valid: false, error: 'Није твој потез.' };
@@ -437,6 +437,7 @@ function validateMove(game, playerId, placements) {
         placements: tempBoard
     };
 }
+
 // ==================== SOCKET.IO SERVER ====================
 const httpServer = http.createServer((req, res) => {
     if (req.url === '/' || req.url === '/index.html') {
@@ -474,14 +475,12 @@ const io = new Server(httpServer, {
         origin: "*",
         methods: ["GET", "POST"]
     },
-    // Možeš dodati pingTimeout, pingInterval za bolju kontrolu
     pingTimeout: 60000,
     pingInterval: 25000
 });
 
 // ==================== MIDDLEWARE ZA IGRAČE ====================
 io.use((socket, next) => {
-    // Trajni playerId se šalje u auth
     const authPlayerId = socket.handshake.auth.playerId;
     let playerId;
     if (authPlayerId && players[authPlayerId]) {
@@ -634,6 +633,11 @@ function handleCreateRoom(socket, playerId) {
         socket.emit('error', { message: 'Већ си у игри.' });
         return;
     }
+    // Ukloni iz matchmaking-a ako je tamo
+    if (matchmaking.has(playerId)) {
+        matchmaking.delete(playerId);
+        console.log(`🔴 Igrač ${playerId.substring(0,8)} uklonjen iz reda zbog kreiranja sobe.`);
+    }
     const link = generateRoomLink();
     rooms[link] = {
         creatorId: playerId,
@@ -652,6 +656,11 @@ function handleJoinRoom(socket, playerId, roomLink) {
     if (player.gameId) {
         socket.emit('error', { message: 'Већ си у игри.' });
         return;
+    }
+    // Ukloni iz matchmaking-a ako je tamo
+    if (matchmaking.has(playerId)) {
+        matchmaking.delete(playerId);
+        console.log(`🔴 Igrač ${playerId.substring(0,8)} uklonjen iz reda zbog pridruživanja sobi.`);
     }
     if (!roomLink || !rooms[roomLink]) {
         socket.emit('error', { message: 'Соба не постоји или је линк неважећи.' });
@@ -697,13 +706,11 @@ function handleFindGame(socket, playerId) {
         return;
     }
 
-    // Ako je već u matchmaking-u, ne dozvoli dupliranje
     if (matchmaking.has(playerId)) {
         socket.emit('finding_game', { message: 'Већ тражиш противника...' });
         return;
     }
 
-    // Pronađi protivnika (koji nije sam igrač)
     let opponentId = null;
     for (const id of matchmaking) {
         if (id !== playerId && players[id] && !players[id].gameId) {
@@ -800,7 +807,6 @@ function handlePlaceTiles(socket, playerId, placements) {
         }
     }
 
-    // Obavesti oba igrača
     for (const pid of Object.keys(game.players)) {
         const state = getGameState(game, pid);
         state.type = 'move_result';
@@ -992,12 +998,10 @@ function handleLeaveGame(socket, playerId) {
     if (!game) return;
 
     const opponentId = Object.keys(game.players).find(id => id !== playerId);
-    // Obavesti protivnika
     if (opponentId && players[opponentId]) {
         sendToPlayer(opponentId, 'opponent_left', { message: `${player.name} је напустио игру.` });
     }
 
-    // Očisti sobu iz socket
     socket.leave(game.id);
     delete games[game.id];
     players[playerId].gameId = null;
@@ -1015,6 +1019,12 @@ function handleDisconnect(socket, playerId) {
     const player = players[playerId];
     if (!player) return;
 
+    // Ako je disconnecting socket različit od trenutnog, ignoriši
+    if (player.socket && player.socket.id !== socket.id) {
+        console.log(`🔌 Stari socket ${socket.id} diskonektovan, ignorišem (trenutni je ${player.socket.id})`);
+        return;
+    }
+
     console.log(`🔌 Socket disconnected: ${socket.id} (playerId: ${playerId.substring(0,8)})`);
 
     // Ukloni iz matchmaking-a odmah
@@ -1030,7 +1040,6 @@ function handleDisconnect(socket, playerId) {
             console.log(`⏳ Igrač ${playerId.substring(0,8)} diskonektovan iz aktivne igre. Čekam ${DISCONNECT_GRACE_MS/1000}s pre predaje...`);
             player.disconnectTimer = setTimeout(() => {
                 console.log(`⏰ Vreme isteklo, automatska predaja igrača ${playerId.substring(0,8)}`);
-                // Ako se igrač nije vratio, proglasi predaju
                 if (players[playerId] && players[playerId].gameId === player.gameId) {
                     handleResign(null, playerId);
                 }
@@ -1051,7 +1060,6 @@ setInterval(() => {
             console.log(`🧹 Očišćena igra ${gameId}`);
         }
     }
-    // Očisti i sobe starije od 10 min
     for (const [link, room] of Object.entries(rooms)) {
         if (now - room.createdAt > 10 * 60 * 1000) {
             delete rooms[link];
