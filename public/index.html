@@ -10,6 +10,7 @@
     
     <!-- Socket.IO klijent -->
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="https://unpkg.com/@capacitor/core/dist/global.js"></script>
     
     <style>
         :root { --cell-size: 34px; }
@@ -392,7 +393,48 @@
             'П':2,'Р':1,'С':1,'Т':1,'Ћ':10,'У':1,'Ф':5,'Х':4,'Ц':4,
             'Ч':4,'Џ':8,'Ш':4
         };
+            // ==================== AdMob MONETIZACIJA ====================
+        const TEST_MODE = true;
 
+        async function initAdMob() {
+            try {
+                console.log('📱 Inicijalizacija AdMob...');
+                const { AdMob } = Capacitor.Plugins;
+                await AdMob.initialize();
+                console.log('✅ AdMob inicijalizovan');
+            } catch (error) {
+                console.error('❌ AdMob init greška:', error);
+            }
+        }
+
+        async function showInterstitial() {
+            try {
+                console.log('📱 Prikazujem interstitial...');
+                const { AdMob } = Capacitor.Plugins;
+                await AdMob.prepareInterstitial({
+                    adId: TEST_MODE 
+                        ? 'ca-app-pub-7529348168507963~1150694435' // Google test interstitial
+                        : 'ca-app-pub-7529348168507963/2173800368',
+                    isTesting: TEST_MODE,
+                });
+                await AdMob.showInterstitial();
+                console.log('✅ Interstitial prikazan!');
+            } catch (error) {
+                console.error('❌ Interstitial greška:', error);
+                // Ne ponavljaj automatski ako nije native, da ne upadne u petlju
+                // Ako želiš ponovni pokušaj, možeš dodati:
+                // setTimeout(showInterstitial, 5000);
+            }
+        }
+
+        // Pokreni AdMob samo na native platformi (Android/iOS)
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform()) {
+                initAdMob();
+            } else {
+                console.log('ℹ️ Nije native platforma — AdMob preskočen');
+            }
+        });
         // ==================== POMOĆNE FUNKCIJE ====================
         function sendMessage(type, data = {}) {
             if (socket.connected) {
