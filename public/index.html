@@ -704,6 +704,14 @@
         }
 
         function startGame(msg) {
+            // Ukloni zaostale dinamičke dugmiće iz prethodne igre
+            removeRematchButton();
+            const oldMenuBtn = document.getElementById('menuBtn');
+            if (oldMenuBtn) oldMenuBtn.remove();
+            
+            showScreen('game');
+            // ... ostatak postojeće funkcije
+        
             showScreen('game');
             gameId = msg.gameId;
             gameActive = true;
@@ -1027,20 +1035,32 @@
             }, 1500);
             
             const controls = document.querySelector('.controls');
-            let rematchBtn = document.getElementById('rematchBtn');
-            if (!rematchBtn) {
-                rematchBtn = document.createElement('button');
-                rematchBtn.id = 'rematchBtn';
-                rematchBtn.className = 'btn-primary';
-                rematchBtn.textContent = '🔄 ТРАЖИ РЕВАНШ';
-                rematchBtn.onclick = () => {
-                    sendMessage('request_rematch');
-                    rematchBtn.disabled = true;
-                    rematchBtn.textContent = '⏳ Чекам одговор...';
-                    setMessage('⏳ Захтев за реванш послат...', 'info', 0);
-                };
-                controls.appendChild(rematchBtn);
-            }
+            
+            // Prvo ukloni sve dinamičke dugmiće (ako postoje)
+            removeRematchButton();
+            const oldMenuBtn = document.getElementById('menuBtn');
+            if (oldMenuBtn) oldMenuBtn.remove();
+            
+            // Dodaj dugme za revanš
+            let rematchBtn = document.createElement('button');
+            rematchBtn.id = 'rematchBtn';
+            rematchBtn.className = 'btn-primary';
+            rematchBtn.textContent = '🔄 ПОНУДИ РЕВАНШ';
+            rematchBtn.onclick = () => {
+                sendMessage('request_rematch');
+                rematchBtn.disabled = true;
+                rematchBtn.textContent = '⏳ Чекам одговор...';
+                setMessage('⏳ Захтев за реванш послат...', 'info', 0);
+            };
+            controls.appendChild(rematchBtn);
+            
+            // Dodaj dugme za početni meni
+            let menuBtn = document.createElement('button');
+            menuBtn.id = 'menuBtn';
+            menuBtn.className = 'btn-light';
+            menuBtn.textContent = '🏠 ПОЧЕТНИ МЕНИ';
+            menuBtn.onclick = () => goToMainMenu();
+            controls.appendChild(menuBtn);
         }
 
         function showRematchRequest(msg) {

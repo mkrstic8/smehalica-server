@@ -662,8 +662,14 @@ function handleCreateRoom(socket, playerId) {
     const player = players[playerId];
     if (!player) return;
     if (player.gameId) {
-        socket.emit('error', { message: 'Већ си у игри.' });
-        return;
+        const existingGame = games[player.gameId];
+        if (existingGame && existingGame.status === 'finished') {
+            player.gameId = null;
+            player.playerNum = null;
+        } else {
+            socket.emit('error', { message: 'Већ си у игри.' });
+            return;
+        }
     }
     // Ukloni iz matchmaking-a ako je tamo
     if (matchmaking.has(playerId)) {
@@ -686,8 +692,14 @@ function handleJoinRoom(socket, playerId, roomLink) {
     const player = players[playerId];
     if (!player) return;
     if (player.gameId) {
-        socket.emit('error', { message: 'Већ си у игри.' });
-        return;
+        const existingGame = games[player.gameId];
+        if (existingGame && existingGame.status === 'finished') {
+            player.gameId = null;
+            player.playerNum = null;
+        } else {
+            socket.emit('error', { message: 'Већ си у игри.' });
+            return;
+        }
     }
     // Ukloni iz matchmaking-a ako je tamo
     if (matchmaking.has(playerId)) {
@@ -734,8 +746,14 @@ function handleFindGame(socket, playerId) {
     const player = players[playerId];
     if (!player) return;
     if (player.gameId) {
-        socket.emit('error', { message: 'Већ си у игри.' });
-        return;
+        const existingGame = games[player.gameId];
+        if (existingGame && existingGame.status === 'finished') {
+            player.gameId = null;
+            player.playerNum = null;
+        } else {
+            socket.emit('error', { message: 'Већ си у игри.' });
+            return;
+        }
     }
 
     if (matchmaking.has(playerId)) {
