@@ -1067,7 +1067,7 @@ httpServer.listen(PORT, () => {
     console.log('═══════════════════════════════════════════');
     console.log(`🚀 Server pokrenut na portu ${PORT}`);
     console.log(`📚 Rečnik: ${DICTIONARY.size} reči`);
-    console.log(`🔌 Socket.IO: ws://localhost:${PORT}`);
+    console.log(`🔌 Socket.IO: http://localhost:${PORT}`);
     console.log(`🌐 HTTP: http://localhost:${PORT}`);
     console.log('═══════════════════════════════════════════');
 });
