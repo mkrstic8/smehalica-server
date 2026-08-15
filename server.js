@@ -523,14 +523,46 @@ io.on('connection', (socket) => {
     });
 
     // Ako je igrač već u aktivnoj igri, automatski pošalji stanje
+    // Ako je igrač već u nekoj igri, obradi prema statusu igre
     if (players[playerId].gameId) {
         const game = games[players[playerId].gameId];
-        if (game && game.status === 'active') {
+
+        // Ako igra više ne postoji (možda je obrisana), očisti igrača
+        if (!game) {
+            players[playerId].gameId = null;
+            players[playerId].playerNum = null;
+            socket.emit('error', { message: 'Претходна игра је обрисана.' });
+        }
+        // Igra je aktivna — pošalji trenutno stanje
+        else if (game.status === 'active') {
             const state = getGameState(game, playerId);
             state.type = 'game_state';
             const opponentId = Object.keys(game.players).find(id => id !== playerId);
             state.opponentName = players[opponentId]?.name || 'Противник';
             socket.emit('game_state', state);
+        }
+        // Igra je već završena — pošalji rezultat da igrač nije zaglavljen
+        else if (game.status === 'finished') {
+            const opponentId = Object.keys(game.players).find(id => id !== playerId);
+            let resultMessage;
+
+            if (game.winner === 'draw') {
+                resultMessage = '🤝 Нерешено!';
+            } else if (game.winner === playerId) {
+                resultMessage = '🎉 Победио/ла си!';
+            } else {
+                resultMessage = '😞 Изгубио/ла си.';
+            }
+
+            const state = getGameState(game, playerId);
+            state.type = 'game_over';
+            state.gameOver = true;
+            state.resultMessage = resultMessage;
+            state.finalScores = {
+                you: game.players[playerId].score,
+                opponent: game.players[opponentId] ? game.players[opponentId].score : 0
+            };
+            socket.emit('game_over', state);
         }
     }
 
