@@ -161,6 +161,7 @@ function createGame(player1Id, player2Id) {
         lastMove: null,
         skipCount: 0,
         createdAt: Date.now()
+        chatMessages: []          // <-- DODAJ OVO
     };
 
     games[gameId] = game;
@@ -202,7 +203,8 @@ function getGameState(game, playerId) {
         status: game.status,
         winner: game.winner,
         bagCount: game.bag.length,
-        lastMove: game.lastMove
+        lastMove: game.lastMove,
+        chatMessages: game.chatMessages || []   // <-- DODAJ OVO
     };
 }
 
@@ -977,12 +979,23 @@ function handleChat(socket, playerId, text) {
     const game = games[player.gameId];
     if (!game) return;
 
-    io.to(game.id).emit('chat_message', {
+    const message = {
         from: player.name,
-        fromId: playerId,
         text: text.substring(0, 200),
         timestamp: Date.now()
-    });
+    };
+
+    // Sačuvaj u istoriju igre
+    game.chatMessages.push(message);
+    if (game.chatMessages.length > 100) {
+        game.chatMessages.shift(); // zadrži max 100 poruka
+    }
+
+    // Pošalji protivniku (svima u sobi osim pošiljaoca)
+    socket.to(game.id).emit('chat_message', message);
+
+    // Pošalji pošiljaocu direktno (garantuje da vidi svoju poruku)
+    socket.emit('chat_message', message);
 }
 
 function handleRematchRequest(socket, playerId) {

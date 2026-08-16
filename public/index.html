@@ -365,7 +365,7 @@
         // Trajni playerId i playerName
         let playerId = localStorage.getItem('smehalica_playerId');
         let myName = localStorage.getItem('smehalica_playerName') || 'Играч';
-        
+        let chatHistory = [];
         const socket = io(SERVER_URL, {
             auth: { playerId },
             reconnection: true,
@@ -551,9 +551,18 @@
         });
 
         socket.on('chat_message', (msg) => {
-            addChatMessage(msg.from, msg.text);
-        });
+            // Proveri da li poruka već postoji u istoriji (deduplikacija)
+            const exists = chatHistory.some(m =>
+                m.timestamp === msg.timestamp &&
+                m.from === msg.from &&
+                m.text === msg.text
+            );
 
+            if (!exists) {
+                chatHistory.push(msg);
+                addChatMessage(msg.from, msg.text);
+            }
+        });
         socket.on('room_created', (msg) => {
             myRoomLink = msg.roomLink;
             document.getElementById('roomLinkDisplay').textContent = msg.roomLink;
@@ -742,6 +751,10 @@
                 document.getElementById('btnSubmit').disabled = !isMyTurn;
                 document.getElementById('btnSkip').disabled = !isMyTurn;
                 document.getElementById('btnRecall').disabled = !isMyTurn;
+            }
+            if (msg.chatMessages) {
+                chatHistory = msg.chatMessages;
+                renderChatHistory();
             }
             if (msg.gameOver) {
                 gameIsOver = true;
@@ -1128,7 +1141,14 @@
             container.appendChild(div);
             container.scrollTop = container.scrollHeight;
         }
-
+        function renderChatHistory() {
+            const container = document.getElementById('chatMessages');
+            container.innerHTML = '';
+            chatHistory.forEach(msg => {
+                addChatMessage(msg.from, msg.text);
+            });
+            container.scrollTop = container.scrollHeight;
+        }
         function addChatSystemMsg(text) {
             const container = document.getElementById('chatMessages');
             const div = document.createElement('div');
