@@ -797,11 +797,30 @@ function handleFindGame(socket, playerId) {
         console.log(`⏳ ${player.name || playerId.substring(0,8)} čeka protivnika (red: ${matchmaking.size})`);
     }
 }
+function handleChat(socket, playerId, text) {
+    const player = players[playerId];
+    if (!player || !player.gameId) return;
+    const game = games[player.gameId];
+    if (!game) return;
 
-function handleCancelFind(socket, playerId) {
-    if (matchmaking.has(playerId)) {
-        matchmaking.delete(playerId);
-        socket.emit('find_cancelled', { message: 'Претрага отказана.' });
+    const message = {
+        from: player.name,
+        text: text.substring(0, 200),
+        timestamp: Date.now()
+    };
+
+    // Sačuvaj u istoriju igre
+    game.chatMessages.push(message);
+    if (game.chatMessages.length > 100) {
+        game.chatMessages.shift(); // zadrži max 100 poruka
+    }
+
+    // Pošalji poruku direktno obojici igrača
+    for (const pid of Object.keys(game.players)) {
+        const p = players[pid];
+        if (p && p.socket) {
+            p.socket.emit('chat_message', message);
+        }
     }
 }
 
