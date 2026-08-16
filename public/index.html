@@ -396,6 +396,8 @@
             // ==================== AdMob MONETIZACIJA ====================
         const TEST_MODE = true;
 
+        let interstitialReady = false;
+
         async function initAdMob() {
             try {
                 console.log('📱 Inicijalizacija AdMob...');
@@ -408,25 +410,25 @@
         }
 
         async function showInterstitial() {
-            try {
-                console.log('📱 Prikazujem interstitial...');
-                const { AdMob } = Capacitor.Plugins;
-                await AdMob.prepareInterstitial({
-                    adId: TEST_MODE 
-                        ? 'ca-app-pub-7529348168507963~1150694435' // Google test interstitial
-                        : 'ca-app-pub-7529348168507963/2173800368',
-                    isTesting: TEST_MODE,
-                });
-                await AdMob.showInterstitial();
-                console.log('✅ Interstitial prikazan!');
-            } catch (error) {
-                console.error('❌ Interstitial greška:', error);
-                // Ne ponavljaj automatski ako nije native, da ne upadne u petlju
-                // Ako želiš ponovni pokušaj, možeš dodati:
-                // setTimeout(showInterstitial, 5000);
-            }
-        }
-
+    if (!adMobInitialized) {
+        console.warn('⚠️ AdMob još nije inicijalizovan, preskačem reklamu.');
+        return;
+    }
+    try {
+        console.log('📱 Prikazujem interstitial...');
+        const { AdMob } = Capacitor.Plugins;
+        await AdMob.prepareInterstitial({
+            adId: TEST_MODE 
+                ? 'ca-app-pub-3940256099942544/1033173712'
+                : 'ca-app-pub-7529348168507963/2173800368',
+            isTesting: TEST_MODE,
+        });
+        await AdMob.showInterstitial();
+        console.log('✅ Interstitial prikazan!');
+    } catch (error) {
+        console.error('❌ Interstitial greška:', error);
+    }
+}
         // Pokreni AdMob samo na native platformi (Android/iOS)
         document.addEventListener('DOMContentLoaded', () => {
             if (window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform()) {
@@ -1011,9 +1013,7 @@
             if (!gameActive) return;
             if (!confirm('Сигуран/на да желиш да се предаш?')) return;
             sendMessage('resign');
-            setTimeout(() => {
-                showInterstitial();
-            }, 300);
+                // showInterstitial() uklonjen — game_over event (showGameOver) će je već pokrenuti
         }
 
         function removeRematchButton() {
