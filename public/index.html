@@ -395,7 +395,7 @@
         };
             // ==================== AdMob MONETIZACIJA ====================
         const TEST_MODE = true;
-
+        let adMobInitialized = false;
         let interstitialReady = false;
 
         async function initAdMob() {
@@ -403,6 +403,7 @@
                 console.log('📱 Inicijalizacija AdMob...');
                 const { AdMob } = Capacitor.Plugins;
                 await AdMob.initialize();
+                adMobInitialized = true;
                 console.log('✅ AdMob inicijalizovan');
             } catch (error) {
                 console.error('❌ AdMob init greška:', error);
