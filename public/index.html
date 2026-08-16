@@ -911,12 +911,12 @@
                         newlyPlacedCells.splice(existingIdx, 1);
                         renderBoardFromState(boardState);
                         renderMyRack();
-                        quickMsg('↩ Плочица враћена на сталак.');
+                        quickMsg('↩ Плочица враћена на таблу.');
                     }
                 } else if (isOccupiedPermanently) {
                     errorMsg('⚠ То поље је већ заузето.');
                 } else {
-                    errorMsg('👆 Прво изабери плочицу са сталке!');
+                    errorMsg('👆 Прво изабери плочицу са табле!');
                 }
                 return;
             }
@@ -953,7 +953,7 @@
             selectedTileIndex = null;
             renderBoardFromState(currentBoardState);
             renderMyRack();
-            quickMsg('↩ Све плочице враћене на сталак.');
+            quickMsg('↩ Све плочице враћене на таблу.');
         }
 
         function shuffleRack() {
@@ -977,8 +977,7 @@
             sendMessage('place_tiles', { placements });
             newlyPlacedCells = [];
             selectedTileIndex = null;
-            permanentMsg('⏳ Шаљем потез на проверу...', 'info');
-        }
+            setMessage('⏳ Шаљем потез на проверу...', 'info', 3000);        }
 
         function skipTurn() {
             if (!isMyTurn || !gameActive || gameIsOver) return;
