@@ -14,8 +14,7 @@
     
 <style>
     :root {
-        --cell-size: min(34px, calc((100vw - 20px) / 15));
-        --tile-size: min(38px, calc((100vw - 20px) / 9));
+        --tile-size: clamp(32px, 8vw, 38px);
     }
 
     * {
@@ -110,38 +109,42 @@
 
     .board-wrapper {
         overflow: auto;
-        max-width: 95vw;
+        max-width: 100%;
         max-height: 55vh;
         border-radius: 8px;
         box-shadow: 0 4px 20px rgba(0,0,0,0.5);
         -webkit-overflow-scrolling: touch;
+        width: 100%;
     }
 
     .board {
         display: grid;
-        grid-template-columns: repeat(15, var(--cell-size));
-        grid-template-rows: repeat(15, var(--cell-size));
+        grid-template-columns: repeat(15, 1fr);
+        grid-template-rows: repeat(15, 1fr);
         gap: 1px;
         background: #1a0f05;
         padding: 2px;
         border-radius: 4px;
+        width: 100%;
+        max-width: 600px;
+        aspect-ratio: 1 / 1;
     }
 
     .cell {
-        width: var(--cell-size);
-        height: var(--cell-size);
         background: #f0e0c8;
         display: flex;
         align-items: center;
         justify-content: center;
         font-weight: bold;
-        font-size: calc(var(--cell-size) * 0.5);
+        font-size: clamp(0.55rem, 3.5vw, 1rem);
         cursor: pointer;
         transition: all 0.15s;
         position: relative;
         border-radius: 2px;
-        min-width: var(--cell-size);
-        min-height: var(--cell-size);
+        width: 100%;
+        height: 100%;
+        min-width: 0;
+        min-height: 0;
     }
 
     .cell:active {
@@ -215,7 +218,7 @@
         position: absolute;
         bottom: 1px;
         right: 2px;
-        font-size: 0.4rem;
+        font-size: clamp(0.3rem, 1.5vw, 0.4rem);
         font-weight: bold;
         color: #fff;
         line-height: 1;
