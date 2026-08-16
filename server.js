@@ -507,6 +507,12 @@ io.on('connection', (socket) => {
             clearTimeout(existingPlayer.disconnectTimer);
             existingPlayer.disconnectTimer = null;
         }
+                // ✅ Ponovo pridruži socket Socket.IO sobi igre (bitno za chat i broadcast poruke!)
+        if (existingPlayer.gameId) {
+            socket.join(existingPlayer.gameId);
+            socket.data.gameId = existingPlayer.gameId;
+        }
+
         console.log(`🔁 Igrač se ponovo povezao: ${playerId.substring(0,8)}`);
     } else {
         players[playerId] = {
@@ -797,7 +803,7 @@ function handleFindGame(socket, playerId) {
         console.log(`⏳ ${player.name || playerId.substring(0,8)} čeka protivnika (red: ${matchmaking.size})`);
     }
 }
-function handleChat(socket, playerId, text) {
+/*function handleChat(socket, playerId, text) {
     const player = players[playerId];
     if (!player || !player.gameId) return;
     const game = games[player.gameId];
@@ -823,7 +829,7 @@ function handleChat(socket, playerId, text) {
         }
     }
 }
-
+*/
 function handlePlaceTiles(socket, playerId, placements) {
     const player = players[playerId];
     if (!player || !player.gameId) {
