@@ -541,10 +541,12 @@
         });
 
         socket.on('game_state', (msg) => {
-            updateGameState(msg);
-            // Ako je igra aktivna, a mi nismo na tabli, prikaži tablu
             if (msg.status === 'active' && !gameActive) {
-                startGame(msg);
+                // Ovo je rekonекcija — prikaži tablu bez poruke "Игра почиње"
+                startGame(msg, true);
+            } else {
+                // Inače samo osveži stanje
+                updateGameState(msg);
             }
         });
 
@@ -702,18 +704,15 @@
             waitingRack = [];
         }
 
-        function startGame(msg) {
-        // Уклони заостале динамичке дугмиће из претходне игре
+        function startGame(msg, isResume = false) {
+            // Ukloni zaostale dinamičke dugmiće iz prethodne igre
             removeRematchButton();
             const oldMenuBtn = document.getElementById('menuBtn');
             if (oldMenuBtn) oldMenuBtn.remove();
             
-            // Врати сва акциона дугмад
+            // Vrati sva akciona dugmad
             showAllActionButtons();
             
-            showScreen('game');
-            // ... ostatak postojeće funkcije
-        
             showScreen('game');
             gameId = msg.gameId;
             gameActive = true;
@@ -721,10 +720,16 @@
             document.getElementById('yourNameLabel').textContent = '👤 Ти';
             document.getElementById('opponentNameLabel').textContent = '🤖 ' + msg.opponentName;
             updateGameState(msg);
-            setMessage('🎮 Игра почиње! ' + (msg.isYourTurn ? 'Ти си на потезу.' : 'Противник је на потезу.'), 'info', 3000);
+            
+            // Prikaži odgovarajuću poruku
+            if (isResume) {
+                setMessage('🔄 Веза обновљена, игра настављена.', 'info', 3000);
+            } else {
+                setMessage('🎮 Игра почиње! ' + (msg.isYourTurn ? 'Ти си на потезу.' : 'Противник је на потезу.'), 'info', 3000);
+            }
+            
             highlightRack();
         }
-
         function updateGameState(msg) {
             if (msg.board) renderBoardFromState(msg.board);
             if (msg.yourRack) myRack = [...msg.yourRack];
