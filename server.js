@@ -160,7 +160,7 @@ function createGame(player1Id, player2Id) {
         winner: null,
         lastMove: null,
         skipCount: 0,
-        createdAt: Date.now()
+        createdAt: Date.now(),
         chatMessages: []          // <-- DODAJ OVO
     };
 
