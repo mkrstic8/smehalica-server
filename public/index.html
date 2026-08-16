@@ -80,7 +80,7 @@
         /* BONUS POLJA */
         .cell.tw{background:#e57373}.cell.dw{background:#ffb74d}.cell.tl{background:#64b5f6}.cell.dl{background:#81c784}.cell.star{background:#ff8a80}
         .cell.occupied.tw,.cell.occupied.dw,.cell.occupied.tl,.cell.occupied.dl,.cell.occupied.star{background:#ffe4b5}
-        .cell.tw::after,.cell.dw::after,.cell.tl::after,.cell.dl::after,.cell.star::after{position:absolute;font-size:0.45rem;font-weight:bold;color:rgba(0,0,0,0.55);pointer-events:none;line-height:1}
+        .cell.tw::after,.cell.dw::after,.cell.tl::after,.cell.dl::after,.cell.star::after{position:absolute;font-size:0.45rem;font-weight:bold;color:white;pointer-events:none;line-height:1}
         .cell.tw::after{content:'3Р'}.cell.dw::after{content:'2Р'}.cell.tl::after{content:'3С'}.cell.dl::after{content:'2С'}.cell.star::after{content:'★';font-size:0.8rem}
         .cell.occupied.tw::after,.cell.occupied.dw::after,.cell.occupied.tl::after,.cell.occupied.dl::after,.cell.occupied.star::after{content:''}
         
@@ -110,7 +110,7 @@
             display: flex; align-items: center; justify-content: center; 
             font-size: 1.2rem; font-weight: bold; cursor: pointer; 
             box-shadow: 0 3px 5px rgba(0,0,0,0.3); transition: all 0.2s; 
-            position: relative; 
+            position: relative; color: #000;
         }
         .tile:active { transform: scale(0.85); }
         .tile.selected { border: 3px solid #FFD700; box-shadow: 0 0 15px rgba(255,215,0,0.8); transform: translateY(-6px); }
@@ -998,7 +998,8 @@
             sendMessage('place_tiles', { placements });
             newlyPlacedCells = [];
             selectedTileIndex = null;
-            setMessage('⏳ Шаљем потез на проверу...', 'info', 3000);        }
+            quickMsg('⏳ Шаљем потез на проверу...');        
+        }
 
         function skipTurn() {
             if (!isMyTurn || !gameActive || gameIsOver) return;
@@ -1007,7 +1008,7 @@
                 recallTiles();
             }
             sendMessage('skip_turn');
-            setMessage('⏭ Прескачеш потез...', 'info', 2000);
+            quickMsg('⏭ Прескачеш потез...');
         }
 
         function resignGame() {
