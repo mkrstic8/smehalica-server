@@ -47,19 +47,47 @@ const tileDistribution = [
 
 // ==================== REČNIK ====================
 let DICTIONARY = new Set();
-try {
-    const dictFile = fs.readFileSync('./serbian-words.txt', 'utf8');
-    const words = dictFile.split(/[\n\r]+/)
-        .map(w => w.trim().toUpperCase())
-        .filter(w => /^[АБВГДЂЕЖЗИЈКЛЉМНЊОПРСТЋУФХЦЧЏШ]+$/.test(w))
-        .filter(w => w.length >= 3 && w.length <= 15);
-    DICTIONARY = new Set(words);
-    console.log(`📚 Rečnik učitan iz fajla: ${DICTIONARY.size} reči (3+ slova)`);
-} catch (e) {
-    console.error('❌ Ne mogu da učitam serbian-words.txt:', e.message);
+function loadDictionary() {
+    try {
+        const dictFile = fs.readFileSync('./serbian-words.txt', 'utf8');
+        const words = dictFile.split(/[\n\r]+/)
+            .map(w => w.trim().toUpperCase())
+            .filter(w => /^[АБВГДЂЕЖЗИЈКЛЉМНЊОПРСТЋУФХЦЧЏШ]+$/.test(w))
+            .filter(w => w.length >= 3 && w.length <= 15);
+
+        const newDictionary = new Set(words);
+        for (const w of allowedTwoLetterWords) newDictionary.add(w);
+
+        const oldSize = DICTIONARY.size;
+        DICTIONARY = newDictionary;
+
+        console.log(`📚 Rečnik učitan: ${DICTIONARY.size} reči (prethodno: ${oldSize})`);
+        return true;
+    } catch (e) {
+        console.error('❌ Ne mogu da učitam serbian-words.txt:', e.message);
+        return false;
+    }
+}
+
+// Učitaj rečnik pri startu
+if (!loadDictionary()) {
     process.exit(1);
 }
 
+// Automatski watch fajla — hot-reload rečnika bez restarta servera
+console.log('👀 Slušam promene u serbian-words.txt...');
+let dictionaryReloadTimeout = null;
+fs.watchFile('./serbian-words.txt', { interval: 1000 }, (curr, prev) => {
+    if (curr.mtime.getTime() !== prev.mtime.getTime()) {
+        console.log('🔄 Rečnik se promenio, učitavam...');
+        // Debounce - ako se fajl menja više puta zaredom (npr. editor snima u koracima),
+        // sačekaj da se promene smire pre nego što učitaš
+        if (dictionaryReloadTimeout) clearTimeout(dictionaryReloadTimeout);
+        dictionaryReloadTimeout = setTimeout(() => {
+            loadDictionary();
+        }, 300);
+    }
+});
 
 // ==================== STANJE IGARA ====================
 const games = {};        // gameId -> gameState
