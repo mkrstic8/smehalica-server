@@ -1,16 +1,6 @@
-
-    /* ============================================================
-   SMEHALICA — "Sunny Day" color redesign
-   Drop this in place of the original  block.
-   Only colors/gradients/shadows changed — all selectors, sizes,
-   layout, and structure are identical to the original.
-   ============================================================ */
-
 :root {
   --tile-size: clamp(32px, 8vw, 38px);
-
-  /* new palette tokens (for reference / easy tweaking) */
-  --accent: #FFC107;        /* golden yellow — main accent */
+  --accent: #FFC107;       
   --accent-light: #FFD54F;
   --accent-glow: rgba(255,193,7,0.7);
   --sun-orange: #FF6F00;
