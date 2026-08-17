@@ -7,7 +7,7 @@ const { Server } = require('socket.io');
 // ==================== KONFIGURACIJA ====================
 const PORT = process.env.PORT || 3000;
 const BOARD_SIZE = 15;
-const DISCONNECT_GRACE_MS = 2 * 60 * 1000; // 2 minuta pre predaje
+const DISCONNECT_GRACE_MS = 20 * 1000; // 2 minuta pre predaje
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 
 // Bonus tabla
@@ -520,7 +520,8 @@ io.on('connection', (socket) => {
             gameId: null,
             playerNum: null,
             name: 'Играч',
-            disconnectTimer: null
+            disconnectTimer: null,
+            lastCancelTime: 0      // <-- DODAJ OVO
         };
     }
 
@@ -754,20 +755,28 @@ function handleFindGame(socket, playerId) {
     const player = players[playerId];
     if (!player) return;
     if (player.gameId) {
-        const existingGame = games[player.gameId];
-        if (existingGame && existingGame.status === 'finished') {
-            player.gameId = null;
-            player.playerNum = null;
-        } else {
-            socket.emit('error', { message: 'Већ си у игри.' });
-            return;
-        }
+        socket.emit('error', { message: 'Већ си у игри.' });
+        return;
+    }
+
+    // Proveri da li je igrač nedavno otkazao pretragu
+    const now = Date.now();
+    const cooldownMs = 10 * 1000; // 10 sekundi zabrane
+    if (player.lastCancelTime && (now - player.lastCancelTime) < cooldownMs) {
+        const remaining = Math.ceil((cooldownMs - (now - player.lastCancelTime)) / 1000);
+        socket.emit('error', { message: `Сачекај ${remaining} секунди пре нове претраге.` });
+        return;
     }
 
     if (matchmaking.has(playerId)) {
         socket.emit('finding_game', { message: 'Већ тражиш противника...' });
         return;
     }
+
+    // ... ostatak ostaje isti
+}
+
+    // ... ostatak ostaje isti
 
     let opponentId = null;
     for (const id of matchmaking) {
@@ -801,6 +810,13 @@ function handleFindGame(socket, playerId) {
             queuePosition: matchmaking.size
         });
         console.log(`⏳ ${player.name || playerId.substring(0,8)} čeka protivnika (red: ${matchmaking.size})`);
+    }
+}
+function handleCancelFind(socket, playerId) {
+    if (matchmaking.has(playerId)) {
+        matchmaking.delete(playerId);
+        players[playerId].lastCancelTime = Date.now();   // <-- DODAJ OVO
+        socket.emit('find_cancelled', { message: 'Претрага отказана.' });
     }
 }
 /*function handleChat(socket, playerId, text) {
