@@ -521,7 +521,8 @@ io.on('connection', (socket) => {
             playerNum: null,
             name: 'Играч',
             disconnectTimer: null,
-            lastCancelTime: 0      // <-- DODAJ OVO
+            lastCancelTime: 0, 
+            roomLink: null          // <-- DODATO: prati koju sobu igrač trenutno drži otvorenu     // <-- DODAJ OVO
         };
     }
 
@@ -680,23 +681,36 @@ function handleCreateRoom(socket, playerId) {
             return;
         }
     }
-    // Ukloni iz matchmaking-a ako je tamo
+
+    const remaining = getCooldownRemaining(player);
+    if (remaining > 0) {
+        socket.emit('error', { message: `Сачекај ${remaining} секунди пре нове акције.`, cooldownSeconds: remaining });
+        return;
+    }
+
     if (matchmaking.has(playerId)) {
         matchmaking.delete(playerId);
         console.log(`🔴 Igrač ${playerId.substring(0,8)} uklonjen iz reda zbog kreiranja sobe.`);
     }
+
+    // Ako igrač već ima otvorenu sobu, obriši je pre nego što napravi novu
+    if (player.roomLink && rooms[player.roomLink]) {
+        delete rooms[player.roomLink];
+    }
+
     const link = generateRoomLink();
     rooms[link] = {
         creatorId: playerId,
         createdAt: Date.now()
     };
+    player.roomLink = link;   // <-- DODATO
+
     socket.emit('room_created', {
         roomLink: link,
         message: `Соба креирана! Пошаљи линк противнику: ${link}`
     });
     console.log(`🏠 Soba kreirana: ${link} od strane ${player.name}`);
 }
-
 function handleJoinRoom(socket, playerId, roomLink) {
     const player = players[playerId];
     if (!player) return;
@@ -710,7 +724,13 @@ function handleJoinRoom(socket, playerId, roomLink) {
             return;
         }
     }
-    // Ukloni iz matchmaking-a ako je tamo
+
+    const remaining = getCooldownRemaining(player);
+    if (remaining > 0) {
+        socket.emit('error', { message: `Сачекај ${remaining} секунди пре нове акције.`, cooldownSeconds: remaining });
+        return;
+    }
+
     if (matchmaking.has(playerId)) {
         matchmaking.delete(playerId);
         console.log(`🔴 Igrač ${playerId.substring(0,8)} uklonjen iz reda zbog pridruživanja sobi.`);
@@ -731,10 +751,9 @@ function handleJoinRoom(socket, playerId, roomLink) {
         return;
     }
 
-    // Kreiraj igru
     const game = createGame(creatorId, playerId);
+    players[creatorId].roomLink = null;   // <-- DODATO
 
-    // Obavesti oba igrača
     const state1 = getGameState(game, creatorId);
     state1.type = 'game_start';
     state1.opponentName = player.name;
@@ -750,7 +769,6 @@ function handleJoinRoom(socket, playerId, roomLink) {
     delete rooms[roomLink];
     console.log(`🎮 Igra ${game.id}: ${players[creatorId].name} vs ${player.name} (soba: ${roomLink})`);
 }
-
 function handleFindGame(socket, playerId) {
     const player = players[playerId];
     if (!player) return;
@@ -759,12 +777,9 @@ function handleFindGame(socket, playerId) {
         return;
     }
 
-    // Proveri da li je igrač nedavno otkazao pretragu
-    const now = Date.now();
-    const cooldownMs = 10 * 1000; // 10 sekundi zabrane
-    if (player.lastCancelTime && (now - player.lastCancelTime) < cooldownMs) {
-        const remaining = Math.ceil((cooldownMs - (now - player.lastCancelTime)) / 1000);
-        socket.emit('error', { message: `Сачекај ${remaining} секунди пре нове претраге.` });
+    const remaining = getCooldownRemaining(player);
+    if (remaining > 0) {
+        socket.emit('error', { message: `Сачекај ${remaining} секунди пре нове претраге.`, cooldownSeconds: remaining });
         return;
     }
 
@@ -772,11 +787,6 @@ function handleFindGame(socket, playerId) {
         socket.emit('finding_game', { message: 'Већ тражиш противника...' });
         return;
     }
-
-    // ... ostatak ostaje isti
-
-
-    // ... ostatak ostaje isti
 
     let opponentId = null;
     for (const id of matchmaking) {
@@ -813,10 +823,28 @@ function handleFindGame(socket, playerId) {
     }
 }
 function handleCancelFind(socket, playerId) {
+    const player = players[playerId];
+    if (!player) return;
+
+    let didCancel = false;
+
     if (matchmaking.has(playerId)) {
         matchmaking.delete(playerId);
-        players[playerId].lastCancelTime = Date.now();   // <-- DODAJ OVO
-        socket.emit('find_cancelled', { message: 'Претрага отказана.' });
+        didCancel = true;
+    }
+
+    if (player.roomLink && rooms[player.roomLink]) {
+        delete rooms[player.roomLink];
+        player.roomLink = null;
+        didCancel = true;
+    }
+
+    if (didCancel) {
+        player.lastCancelTime = Date.now();
+        socket.emit('find_cancelled', {
+            message: 'Претрага отказана.',
+            cooldownSeconds: 10
+        });
     }
 }
 /*function handleChat(socket, playerId, text) {
@@ -1117,7 +1145,14 @@ function handleLeaveGame(socket, playerId) {
     }
     console.log(`🚪 ${player.name} napušta igru ${game.id}`);
 }
-
+function getCooldownRemaining(player) {
+    const cooldownMs = 10 * 1000;
+    const now = Date.now();
+    if (player.lastCancelTime && (now - player.lastCancelTime) < cooldownMs) {
+        return Math.ceil((cooldownMs - (now - player.lastCancelTime)) / 1000);
+    }
+    return 0;
+}
 // ==================== DISCONNECT SA GRACE PERIODOM ====================
 function handleDisconnect(socket, playerId) {
     const player = players[playerId];
