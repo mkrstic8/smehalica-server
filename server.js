@@ -774,7 +774,7 @@ function handleFindGame(socket, playerId) {
     }
 
     // ... ostatak ostaje isti
-}
+
 
     // ... ostatak ostaje isti
 
