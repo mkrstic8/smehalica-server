@@ -378,8 +378,8 @@ button {
 .btn-secondary:hover { background:#EF6C00; }
 .btn-primary { background:#FFC107; color:white; }
 .btn-primary:hover { background:#FFD54F; }
-.btn-warning { background:#FB8C00; color:white; }
-.btn-warning:hover { background:#EF6C00; }
+.btn-warning { background:#c700ef; color:white; }
+.btn-warning:hover { background:#6b2281; }
 .btn-info { background:#29B6F6; color:white; }
 .btn-info:hover { background:#0288D1; }
 
@@ -616,7 +616,7 @@ button:disabled {
         
         <div class="overlay-content" id="rulesScreen" style="display:none; max-width: 500px; max-height: 80vh; overflow-y: auto; text-align: left;">
             <h2 style="text-align:center;">📜 Правила игре</h2>
-            <p style="font-size:0.85rem; line-height:1.6; margin-bottom:15px;">
+            <p style="font-size:1.0rem; line-height:1.6; margin-bottom:15px;">
                 Помаже Бог драги играчи, љубитељи српског језика и ћирилице!
             </p>
             <p style="font-size:0.85rem; line-height:1.6; margin-bottom:15px;">
@@ -1031,6 +1031,12 @@ button:disabled {
         }
         
         function quickMatch() {
+            document.getElementById('optionsScreen').style.display = 'none';
+            document.getElementById('findingScreen').style.display = 'block';
+            
+            // Onemogući dugme za brzu igru dok traje pretraga
+            const btnQuick = document.querySelector('.btn-success');
+            if (btnQuick) btnQuick.disabled = true;
             showScreen('findingScreen');
             waitingRack = [];
             const allLetters = 'АБВГДЂЕЖЗИЈКЛЉМНЊОПРСТЋУФХЦЧЏШ';
