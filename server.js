@@ -53,7 +53,7 @@ function loadDictionary() {
         const words = dictFile.split(/[\n\r]+/)
             .map(w => w.trim().toUpperCase())
             .filter(w => /^[АБВГДЂЕЖЗИЈКЛЉМНЊОПРСТЋУФХЦЧЏШ]+$/.test(w))
-            .filter(w => w.length >= 3 && w.length <= 15);
+            .filter(w => w.length >= 2 && w.length <= 15);
 
         const newDictionary = new Set(words);
 
