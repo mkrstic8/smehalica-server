@@ -47,7 +47,6 @@ const tileDistribution = [
 
 // ==================== REČNIK ====================
 let DICTIONARY = new Set();
-
 try {
     const dictFile = fs.readFileSync('./serbian-words.txt', 'utf8');
     const words = dictFile.split(/[\n\r]+/)
@@ -61,30 +60,6 @@ try {
     process.exit(1);
 }
 
-// Dodaj dozvoljene dvoslovne reči
-const allowedTwoLetterWords = [
-    'АД','АХ','АЈ','АЛ','АС','АТ','АУ',
-    'БА','БЕ','БИ',
-    'ДА','ДЕ','ДО',
-    'ЕХ','ЕЈ',
-    'ЈА','ЈЕ',
-    'КА','КО',
-    'МА','МЕ','МИ','МУ',
-    'НА','НЕ','НИ','НО',
-    'ОД','ОН','ОТ',
-    'ПА','ПО',
-    'СА','СЕ','СИ','СО','СУ',
-    'ТА','ТЕ','ТИ','ТО','ТУ',
-    'УЗ','УФ',
-    'ХА','ХЕ','ХИ','ХО',
-    'ЋЕ','ЋИ','ЋУ',
-    'ШУ'
-];
-
-for (const w of allowedTwoLetterWords) DICTIONARY.add(w);
-
-console.log(`📚 Dodato ${allowedTwoLetterWords.length} dvoslovnih reči`);
-console.log(`📚 Ukupno reči u rečniku: ${DICTIONARY.size}`);
 
 // ==================== STANJE IGARA ====================
 const games = {};        // gameId -> gameState
