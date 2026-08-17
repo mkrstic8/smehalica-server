@@ -444,20 +444,44 @@ function validateMove(game, playerId, placements) {
 const httpServer = http.createServer((req, res) => {
     if (req.url === '/' || req.url === '/index.html') {
         const filePath = path.join(__dirname, 'public', 'index.html');
+
         try {
             const html = fs.readFileSync(filePath, 'utf8');
-            res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+            res.writeHead(200, {
+                'Content-Type': 'text/html; charset=utf-8'
+            });
             res.end(html);
         } catch (e) {
-            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.writeHead(500, {
+                'Content-Type': 'application/json; charset=utf-8'
+            });
             res.end(JSON.stringify({
                 server: 'Смехалица укрштеница',
                 version: '1.0.0',
-                error: 'HTML fajl nije pronađen. Kreiraj public/index.html'
+                error: 'HTML fajl nije pronađen.'
             }));
         }
+
+    } else if (req.url === '/style.css') {
+        const filePath = path.join(__dirname, 'public', 'style.css');
+
+        try {
+            const css = fs.readFileSync(filePath, 'utf8');
+            res.writeHead(200, {
+                'Content-Type': 'text/css; charset=utf-8'
+            });
+            res.end(css);
+        } catch (e) {
+            res.writeHead(404, {
+                'Content-Type': 'text/plain; charset=utf-8'
+            });
+            res.end('style.css nije pronađen');
+        }
+
     } else if (req.url === '/status') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.writeHead(200, {
+            'Content-Type': 'application/json; charset=utf-8'
+        });
         res.end(JSON.stringify({
             server: 'Смехалица укрштеница',
             version: '1.0.0',
@@ -466,8 +490,11 @@ const httpServer = http.createServer((req, res) => {
             dictionarySize: DICTIONARY.size,
             waitingPlayers: matchmaking.size
         }));
+
     } else {
-        res.writeHead(404);
+        res.writeHead(404, {
+            'Content-Type': 'text/plain; charset=utf-8'
+        });
         res.end('Stranica ne postoji');
     }
 });
