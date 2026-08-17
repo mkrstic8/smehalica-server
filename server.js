@@ -56,7 +56,6 @@ function loadDictionary() {
             .filter(w => w.length >= 3 && w.length <= 15);
 
         const newDictionary = new Set(words);
-        for (const w of allowedTwoLetterWords) newDictionary.add(w);
 
         const oldSize = DICTIONARY.size;
         DICTIONARY = newDictionary;
