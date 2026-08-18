@@ -416,6 +416,12 @@
         });
 
         socket.on('game_over', (msg) => {
+            if (!gameActive && !gameIsOver) {
+                // Igra je završena dok nismo bili povezani - prikaži je sada
+                showScreen('game');
+                document.getElementById('yourNameLabel').textContent = '👤 Ти';
+                document.getElementById('opponentNameLabel').textContent = '🤖 ' + (msg.opponentName || 'Противник');
+            }
             updateGameState(msg);
             showGameOver(msg);
             if (msg.resultMessage && msg.resultMessage.includes('Победио')) {
@@ -423,7 +429,6 @@
                 setTimeout(spawnConfetti, 500);
             }
         });
-
         socket.on('game_state', (msg) => {
             if (msg.status === 'active' && !gameActive) {
                 // Ovo je rekonекcija — prikaži tablu bez poruke "Игра почиње"
