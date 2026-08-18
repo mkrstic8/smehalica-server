@@ -592,9 +592,7 @@
             if (poslovice.length > 0) {
                 const randomIzreka =
                     poslovice[Math.floor(Math.random() * poslovice.length)];
-
-                document.getElementById('proverbText').textContent =
-                    '💬 ' + randomIzreka;
+                    document.getElementById('proverbText').innerHTML = `„${randomIzreka}“<br><strong>Народна изрека</strong>`;
             }
 
             // Тражи противника
