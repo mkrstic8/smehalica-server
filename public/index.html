@@ -563,6 +563,7 @@
 
         // ==================== UI FUNKCIJE ====================
         function showGameOptions() {
+            sfxMenuClick();
             myName = document.getElementById('nameInput').value.trim() || 'Играч';
             localStorage.setItem('smehalica_playerName', myName);
             sendMessage('set_name', { name: myName });
@@ -570,15 +571,18 @@
         }
         
         function goBackToName() {
+            sfxMenuClick();
             showScreen('nameScreen');
         }
         
         function goBackToOptions() {
+            sfxMenuClick();
             document.getElementById('btnQuickMatch').disabled = false;   // ✅ dodato
             showScreen('optionsScreen');
         }
         
         async function quickMatch() {
+            sfxMenuClick();
             document.getElementById('optionsScreen').style.display = 'none';
             document.getElementById('findingScreen').style.display = 'block';
             showScreen('findingScreen');
@@ -600,12 +604,14 @@
         }
         
         function showCreateRoom() {
+            sfxMenuClick();
             showScreen('createRoomScreen');
             document.getElementById('roomStatus').textContent = 'Креирам собу...';
             sendMessage('create_room');
         }
         
         function showJoinRoom() {
+            sfxMenuClick();
             showScreen('joinRoomScreen');
             document.getElementById('roomLinkInput').value = '';
             document.getElementById('joinStatus').textContent = '';
@@ -954,6 +960,7 @@
         }
 
         function goToMainMenu() {
+            sfxMenuClick();
             sendMessage('leave_game');
             
             removeRematchButton();
@@ -1107,10 +1114,12 @@
         }
 
         function showRules() {
+            sfxMenuClick();
             showScreen('rulesScreen');
         }
         
         function hideRules() {
+            sfxMenuClick();
             showScreen('optionsScreen');
         }
 
@@ -1118,44 +1127,77 @@
             sendMessage('get_state');
         }
 
-        // ==================== ZVUCI ====================
+         // ==================== ZVUCI (Web Audio API) ====================
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         let audioCtx = null;
-        function getAudioCtx() { if (!audioCtx) audioCtx = new AudioCtx(); return audioCtx; }
-        function playTone(freq, duration, type = 'sine', vol = 0.1) {
+
+        function getAudioCtx() {
+            if (!audioCtx) audioCtx = new AudioCtx();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            return audioCtx;
+        }
+
+        function playTone(freq, duration, type = 'sine', vol = 0.1, delay = 0) {
             try {
                 const ctx = getAudioCtx();
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
+
+                const startTime = ctx.currentTime + delay;
+
                 osc.type = type;
-                osc.frequency.value = freq;
-                gain.gain.value = vol;
-                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+                osc.frequency.setValueAtTime(freq, startTime);
+
+                // Благи ADSR
+                gain.gain.setValueAtTime(0, startTime);
+                gain.gain.linearRampToValueAtTime(vol, startTime + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
                 osc.connect(gain);
                 gain.connect(ctx.destination);
-                osc.start(ctx.currentTime);
-                osc.stop(ctx.currentTime + duration);
+                osc.start(startTime);
+                osc.stop(startTime + duration);
             } catch(e) {}
         }
-        function sfxPlace() { playTone(600, 0.1, 'sine', 0.08); }
-        function sfxValid() { playTone(523, 0.15, 'sine', 0.1); setTimeout(() => playTone(659, 0.15, 'sine', 0.1), 150); setTimeout(() => playTone(784, 0.25, 'sine', 0.12), 300); }
-        function sfxInvalid() { playTone(200, 0.3, 'sawtooth', 0.06); setTimeout(() => playTone(150, 0.3, 'sawtooth', 0.06), 200); }
-        function sfxWin() { [523, 659, 784, 1047].forEach((n, i) => setTimeout(() => playTone(n, 0.3, 'sine', 0.12), i * 200)); }
-        function sfxOpponent() { playTone(440, 0.1, 'triangle', 0.08); setTimeout(() => playTone(380, 0.12, 'triangle', 0.08), 120); setTimeout(() => playTone(320, 0.15, 'triangle', 0.06), 240); }
 
-        // ==================== ANIMACIJE ====================
-        function animateCell(row, col, animClass) { const cell = document.querySelector(`.cell[data-row="${row}"][data-col="${col}"]`); if (cell) { cell.classList.add(animClass); setTimeout(() => cell.classList.remove(animClass), 600); } }
-        function spawnParticles(x, y, color, count = 10) { for (let i = 0; i < count; i++) { const particle = document.createElement('div'); particle.className = 'particle'; particle.style.left = x + 'px'; particle.style.top = y + 'px'; particle.style.background = color; particle.style.setProperty('--dx', (Math.random() - 0.5) * 100 + 'px'); particle.style.setProperty('--dy', (Math.random() - 0.5) * 100 - 40 + 'px'); document.body.appendChild(particle); setTimeout(() => particle.remove(), 1100); } }
-        function spawnConfetti() { const colors = ['#ff0','#f00','#0f0','#00f','#f0f','#0ff','#ffa500','#ff69b4']; for (let i = 0; i < 40; i++) { setTimeout(() => { const piece = document.createElement('div'); piece.className = 'confetti-piece'; piece.style.cssText = `position: fixed; left: ${Math.random() * 100}%; top: ${Math.random() * 40}%; width: 12px; height: 12px; background: ${colors[Math.floor(Math.random() * colors.length)]}; z-index: 9999; pointer-events: none; animation: confetti ${1.5 + Math.random() * 2}s ease-out forwards; border-radius: ${Math.random() > 0.5 ? '50%' : '2px'};`; document.body.appendChild(piece); setTimeout(() => piece.remove(), 3500); }, i * 25); } }
-        function highlightRack() { const rack = document.getElementById('rack'); if (rack) { rack.classList.add('rack-highlight'); setTimeout(() => rack.classList.remove('rack-highlight'), 2500); } }
+        function sfxMenuClick() {
+            playTone(800, 0.08, 'sine', 0.08);
+            playTone(1000, 0.08, 'sine', 0.06, 0.04);
+        }
 
-        // ==================== POKRETANJE ====================
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('.tile') && !e.target.closest('#rack') && !e.target.closest('.cell')) {
-                selectedTileIndex = null;
-                renderMyRack();
-            }
-        });
+        function sfxPlace() {
+            playTone(600, 0.07, 'sine', 0.09);
+            playTone(800, 0.06, 'triangle', 0.06, 0.04);
+        }
+
+        function sfxValid() {
+            const notes = [523, 659, 784];
+            notes.forEach((n, i) => {
+                playTone(n, 0.18, 'sine', 0.11, i * 0.1);
+                playTone(n * 2, 0.1, 'triangle', 0.05, i * 0.1);
+            });
+            playTone(1047, 0.35, 'sine', 0.1, 0.3);
+        }
+
+        function sfxInvalid() {
+            playTone(220, 0.15, 'sawtooth', 0.05);
+            playTone(180, 0.22, 'sawtooth', 0.05, 0.1);
+        }
+
+        function sfxWin() {
+            const melody = [523, 659, 784, 1047];
+            melody.forEach((n, i) => {
+                playTone(n, 0.3, 'sine', 0.12, i * 0.18);
+                playTone(n / 2, 0.3, 'triangle', 0.07, i * 0.18);
+            });
+            playTone(1319, 0.5, 'sine', 0.12, melody.length * 0.18);
+        }
+
+        function sfxOpponent() {
+            playTone(440, 0.09, 'triangle', 0.08);
+            playTone(380, 0.1, 'triangle', 0.08, 0.09);
+            playTone(320, 0.12, 'triangle', 0.06, 0.18);
+        }
 
         // Capacitor appStateChange (ako postoji)
         try {
