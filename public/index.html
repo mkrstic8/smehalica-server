@@ -177,6 +177,7 @@
 
         <div class="chat-area">
             <div class="chat-messages" id="chatMessages"></div>
+            <div id="typingIndicator" style="display:none; font-size:0.7rem; opacity:0.7; font-style:italic; padding:2px 6px;">✍ Противник куца...</div>
             <div class="chat-input-row">
                 <input type="text" id="chatInput" placeholder="Порука..." maxlength="200" onkeypress="if(event.key==='Enter')sendChat()">
                 <button class="btn-secondary" onclick="sendChat()">📩</button>
@@ -380,6 +381,7 @@
          });
 
         socket.on('move_result', (msg) => {
+            moveInFlight = false;
             updateGameState(msg);
             if (msg.lastMoveWords && msg.lastMoveWords.length > 0) {
                 const isMyMove = msg.lastMovePlayerName === myName;
@@ -404,6 +406,7 @@
         });
 
         socket.on('move_invalid', (msg) => {
+            moveInFlight = false;
             sfxInvalid();
             newlyPlacedCells.forEach(p => animateCell(p.row, p.col, 'shake'));
             errorMsg('❌ Неважећи потез: ' + msg.error);
@@ -416,6 +419,7 @@
         });
 
         socket.on('game_over', (msg) => {
+            moveInFlight = false;
             if (!gameActive && !gameIsOver) {
                 // Igra je završena dok nismo bili povezani - prikaži je sada
                 showScreen('game');
@@ -437,6 +441,13 @@
                 // Inače samo osveži stanje
                 updateGameState(msg);
             }
+        });
+
+        socket.on('opponent_typing', () => {
+            const el = document.getElementById('typingIndicator');
+            el.style.display = 'block';
+            if (window.typingTimeout) clearTimeout(window.typingTimeout);
+            window.typingTimeout = setTimeout(() => { el.style.display = 'none'; }, 3000);
         });
 
         socket.on('chat_message', (msg) => {
@@ -497,6 +508,24 @@
         });
 
         socket.on('pong', () => {});
+
+        socket.io.on('reconnect_attempt', (attempt) => {
+            document.getElementById('connectionStatus').innerHTML =
+                `<span class="connection-dot disconnected"></span> Покушавам поновну везу (${attempt})...`;
+        });
+
+        socket.io.on('reconnect', () => {
+            document.getElementById('connectionStatus').innerHTML =
+                '<span class="connection-dot connected"></span> Веза обновљена!';
+        });
+        
+        socket.on('opponent_disconnected', (msg) => {
+            permanentMsg('⚠ ' + msg.message);
+        });
+
+        socket.on('opponent_reconnected', (msg) => {
+            successMsg('✅ ' + msg.message);
+        });
 
         // ==================== INICIJALIZACIJA ====================
         function initialSetup() {
@@ -878,13 +907,17 @@
             quickMsg('🔀 Плочице промешане.');
         }
 
+        let moveInFlight = false;
+
         function submitMove() {
-            if (!isMyTurn || !gameActive || gameIsOver) return;
+            if (!isMyTurn || !gameActive || gameIsOver || moveInFlight) return;
             if (newlyPlacedCells.length === 0) {
                 errorMsg('⚠ Постави бар једно слово на таблу!');
                 return;
             }
             const placements = newlyPlacedCells.map(p => ({ row: p.row, col: p.col, letter: p.letter }));
+            moveInFlight = true;
+            document.getElementById('btnSubmit').disabled = true;
             sendMessage('place_tiles', { placements });
             newlyPlacedCells = [];
             selectedTileIndex = null;
@@ -1018,6 +1051,8 @@
         }
 
         // ==================== CHAT ====================
+        let lastTypingSent = 0;
+
         function sendChat() {
             const input = document.getElementById('chatInput');
             const text = input.value.trim();
@@ -1026,6 +1061,13 @@
             input.value = '';
         }
 
+        document.getElementById('chatInput').addEventListener('input', () => {
+            const now = Date.now();
+            if (now - lastTypingSent > 1500) {
+                sendMessage('typing');
+                lastTypingSent = now;
+            }
+        });
         function addChatMessage(from, text) {
             const container = document.getElementById('chatMessages');
             const div = document.createElement('div');

@@ -550,6 +550,16 @@ io.on('connection', (socket) => {
         if (existingPlayer.gameId) {
             socket.join(existingPlayer.gameId);
             socket.data.gameId = existingPlayer.gameId;
+
+            const activeGame = games[existingPlayer.gameId];
+            if (activeGame && activeGame.status === 'active') {
+                const opponentId = Object.keys(activeGame.players).find(id => id !== playerId);
+                if (opponentId) {
+                    sendToPlayer(opponentId, 'opponent_reconnected', {
+                        message: `${existingPlayer.name} се вратио у игру.`
+                    });
+                }
+            }
         }
 
         console.log(`🔁 Igrač se ponovo povezao: ${playerId.substring(0,8)}`);
@@ -657,6 +667,13 @@ io.on('connection', (socket) => {
 
     socket.on('chat', (data) => {
         handleChat(socket, playerId, data.text);
+    });
+
+    socket.on('typing', () => {
+        const p = players[playerId];
+        if (p && p.gameId) {
+            socket.to(p.gameId).emit('opponent_typing');
+        }
     });
 
     socket.on('request_rematch', () => {
@@ -1140,6 +1157,8 @@ function handleAcceptRematch(socket, playerId, fromId) {
     }
     const oldGame = games[opponent.gameId];
     if (!oldGame || oldGame.status !== 'finished') return;
+    if (oldGame.rematchStarted) return; // sprečava dupli rematch
+    oldGame.rematchStarted = true;
 
     const newGame = createGame(fromId, playerId);
     const state1 = getGameState(newGame, fromId);
@@ -1220,6 +1239,13 @@ function handleDisconnect(socket, playerId) {
     if (player.gameId) {
         const game = games[player.gameId];
         if (game && game.status === 'active') {
+            const opponentId = Object.keys(game.players).find(id => id !== playerId);
+            if (opponentId) {
+                sendToPlayer(opponentId, 'opponent_disconnected', {
+                    message: `${player.name} је изгубио везу. Чекам повратак...`,
+                    graceSeconds: DISCONNECT_GRACE_MS / 1000
+                });
+            }
             console.log(`⏳ Igrač ${playerId.substring(0,8)} diskonektovan iz aktivne igre. Čekam ${DISCONNECT_GRACE_MS/1000}s pre predaje...`);
             player.disconnectTimer = setTimeout(() => {
                 console.log(`⏰ Vreme isteklo, automatska predaja igrača ${playerId.substring(0,8)}`);
