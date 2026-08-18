@@ -502,10 +502,19 @@ const httpServer = http.createServer((req, res) => {
             dictionarySize: DICTIONARY.size,
             waitingPlayers: matchmaking.size
         }));
-     } else if (pathname === '/favicon.ico') {
-        res.writeHead(204);
-        res.end();
-
+         } else if (pathname === '/favicon.ico') {
+        const filePath = path.join(__dirname, 'public', 'favicon.ico');
+        try {
+            const icon = fs.readFileSync(filePath);
+            res.writeHead(200, {
+                'Content-Type': 'image/png',
+                'Cache-Control': 'public, max-age=86400'
+            });
+            res.end(icon);
+        } catch (e) {
+            res.writeHead(204);
+            res.end();
+        }
     } else {
         res.writeHead(404, {
             'Content-Type': 'text/plain; charset=utf-8'
