@@ -1087,7 +1087,10 @@ function handleResign(socket, playerId) {
 
 function handleChat(socket, playerId, text) {
     if (typeof text !== 'string' || text.trim().length === 0) return;
+
     const player = players[playerId];
+    if (!player || !player.gameId) return;
+    const game = games[player.gameId];
     if (!game) return;
 
     const message = {
