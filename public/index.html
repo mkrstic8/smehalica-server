@@ -1139,7 +1139,7 @@ socket.on('connected', (data) => {
         function addChatMessage(from, text) {
             const container = document.getElementById('chatMessages');
             const div = document.createElement('div');
-            div.innerHTML = `<strong>${from}:</strong> ${escapeHtml(text)}`;
+            div.innerHTML = `<strong>${escapeHtml(from)}:</strong> ${escapeHtml(text)}`;
             container.appendChild(div);
             container.scrollTop = container.scrollHeight;
         }

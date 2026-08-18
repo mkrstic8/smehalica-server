@@ -106,7 +106,9 @@ function sanitizePlayerName(name) {
 
     const clean = name
         .normalize('NFC')
-        .replace(/[\u0000-\u001F\u007F]/g, '')
+        .replace(/[\u0000-\u001F\u007F]/g, '')       // ukloni kontrolne karaktere
+        .replace(/[^\p{L}\p{N} ._!?-]/gu, '')         // beli spisak: slova (bilo kog pisma), brojevi, razmak, . _ ! ? -
+        .replace(/\s+/g, ' ')                         // spoji višestruke razmake u jedan
         .trim()
         .slice(0, 20);
 
@@ -496,6 +498,32 @@ for (const p of placements) {
     };
 }
 
+// Bezbednosni HTTP header-i dodati na svaki odgovor.
+// NAPOMENA: script-src/style-src i dalje sadrže 'unsafe-inline' jer index.html
+// trenutno koristi inline onclick="" atribute i inline <script>/style="" blokove.
+// Ovi header-i i dalje pomažu (zaštita od clickjackinga, blokiranje <object>/<embed>,
+// ograničenje spoljnih konekcija i skripti na dozvoljene domene), ali SAMI PO SEBI
+// ne blokiraju inline-handler XSS (npr. name="<svg onload=...>") — to je zatvoreno
+// eskejpovanjem u addChatMessage() i belespiskovnom sanitizePlayerName() ispravkom.
+const SECURITY_HEADERS = {
+    'Content-Security-Policy': [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline' https://cdn.socket.io",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data:",
+        "font-src 'self'",
+        "connect-src 'self'",
+        "object-src 'none'",
+        "base-uri 'none'",
+        "frame-ancestors 'none'",
+        "form-action 'self'"
+    ].join('; '),
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    'Strict-Transport-Security': 'max-age=15552000'
+};
+
 // ==================== SOCKET.IO SERVER ====================
 const httpServer = http.createServer((req, res) => {
     const pathname = url.parse(req.url).pathname;
@@ -506,6 +534,7 @@ const httpServer = http.createServer((req, res) => {
         try {
             const html = fs.readFileSync(filePath, 'utf8');
             res.writeHead(200, {
+                ...SECURITY_HEADERS,
                 'Content-Type': 'text/html; charset=utf-8',
                 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
                 'Pragma': 'no-cache',
@@ -515,6 +544,7 @@ const httpServer = http.createServer((req, res) => {
             res.end(html);
         } catch (e) {
             res.writeHead(500, {
+                ...SECURITY_HEADERS,
                 'Content-Type': 'application/json; charset=utf-8'
             });
             res.end(JSON.stringify({
@@ -530,6 +560,7 @@ const httpServer = http.createServer((req, res) => {
         try {
             const css = fs.readFileSync(filePath, 'utf8');
             res.writeHead(200, {
+                ...SECURITY_HEADERS,
                 'Content-Type': 'text/css; charset=utf-8',
                 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
                 'Pragma': 'no-cache',
@@ -538,6 +569,7 @@ const httpServer = http.createServer((req, res) => {
             res.end(css);
         } catch (e) {
             res.writeHead(404, {
+                ...SECURITY_HEADERS,
                 'Content-Type': 'text/plain; charset=utf-8'
             });
             res.end('style.css nije pronađen');
@@ -547,12 +579,14 @@ const httpServer = http.createServer((req, res) => {
     try {
         const txt = fs.readFileSync(filePath, 'utf8');
         res.writeHead(200, {
+            ...SECURITY_HEADERS,
             'Content-Type': 'text/plain; charset=utf-8',
             'Cache-Control': 'no-cache'
         });
         res.end(txt);
     } catch (e) {
         res.writeHead(404, {
+            ...SECURITY_HEADERS,
             'Content-Type': 'text/plain; charset=utf-8'
         });
         res.end('izreke.txt nije pronađen');
@@ -560,6 +594,7 @@ const httpServer = http.createServer((req, res) => {
 
     } else if (pathname === '/status') {
         res.writeHead(200, {
+            ...SECURITY_HEADERS,
             'Content-Type': 'application/json; charset=utf-8'
         });
         res.end(JSON.stringify({
@@ -575,16 +610,18 @@ const httpServer = http.createServer((req, res) => {
         try {
             const icon = fs.readFileSync(filePath);
             res.writeHead(200, {
+                ...SECURITY_HEADERS,
                 'Content-Type': 'image/png',
                 'Cache-Control': 'public, max-age=86400'
             });
             res.end(icon);
         } catch (e) {
-            res.writeHead(204);
+            res.writeHead(204, SECURITY_HEADERS);
             res.end();
         }
     } else {
         res.writeHead(404, {
+            ...SECURITY_HEADERS,
             'Content-Type': 'text/plain; charset=utf-8'
         });
         res.end('Stranica ne postoji');
@@ -739,19 +776,6 @@ io.on('connection', (socket) => {
             socket.emit('game_over', state);
         }
     }
-    function sanitizePlayerName(name) {
-    if (typeof name !== 'string') {
-        return 'Играч';
-    }
-
-    const clean = name
-        .normalize('NFC')
-        .replace(/[\u0000-\u001F\u007F]/g, '')
-        .trim()
-        .slice(0, 20);
-
-    return clean || 'Играч';
-}
 
     // ---------- EVENTI ----------
     
