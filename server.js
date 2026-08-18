@@ -7,9 +7,9 @@ const { Server } = require('socket.io');
 // ==================== KONFIGURACIJA ====================
 const PORT = process.env.PORT || 3000;
 const BOARD_SIZE = 15;
-const DISCONNECT_GRACE_MS = 20 * 1000; // 2 minuta pre predaje
+const DISCONNECT_GRACE_MS = 60 * 1000; // 1 minut pre predaje
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
-
+const COOLDOWN_MS = 10 * 1000;
 // Bonus tabla
 const bonusBoard = [
     ['TW','','','DL','','','','TW','','','','DL','','','TW'],
@@ -872,7 +872,7 @@ function handleCancelFind(socket, playerId) {
         player.lastCancelTime = Date.now();
         socket.emit('find_cancelled', {
             message: 'Претрага отказана.',
-            cooldownSeconds: 10
+            cooldownSeconds: COOLDOWN_MS / 1000
         });
     }
 }
@@ -904,6 +904,10 @@ function handleCancelFind(socket, playerId) {
 }
 */
 function handlePlaceTiles(socket, playerId, placements) {
+    if (!Array.isArray(placements)) {
+        socket.emit('error', { message: 'Неисправан формат потеза.' });
+        return;
+    }
     const player = players[playerId];
     if (!player || !player.gameId) {
         socket.emit('error', { message: 'Ниси у игри.' });
@@ -1072,9 +1076,8 @@ function handleResign(socket, playerId) {
 }
 
 function handleChat(socket, playerId, text) {
+    if (typeof text !== 'string' || text.trim().length === 0) return;
     const player = players[playerId];
-    if (!player || !player.gameId) return;
-    const game = games[player.gameId];
     if (!game) return;
 
     const message = {
@@ -1175,10 +1178,9 @@ function handleLeaveGame(socket, playerId) {
     console.log(`🚪 ${player.name} napušta igru ${game.id}`);
 }
 function getCooldownRemaining(player) {
-    const cooldownMs = 10 * 1000;
     const now = Date.now();
-    if (player.lastCancelTime && (now - player.lastCancelTime) < cooldownMs) {
-        return Math.ceil((cooldownMs - (now - player.lastCancelTime)) / 1000);
+    if (player.lastCancelTime && (now - player.lastCancelTime) < COOLDOWN_MS) {
+        return Math.ceil((COOLDOWN_MS - (now - player.lastCancelTime)) / 1000);
     }
     return 0;
 }
@@ -1234,8 +1236,25 @@ setInterval(() => {
             console.log(`🧹 Očišćena soba ${link}`);
         }
     }
+    // NOVO: očisti igrače koji su offline duže od 1h i nisu u aktivnoj igri
+    for (const [pid, player] of Object.entries(players)) {
+        if (!player.socket && !player.gameId && !matchmaking.has(pid)) {
+            const lastSeen = player.lastCancelTime || 0;
+            if (now - lastSeen > 60 * 60 * 1000) {
+                delete players[pid];
+            }
+        }
+    }
 }, CLEANUP_INTERVAL_MS);
+// ==================== GLOBALNA ZAŠTITA OD PADA SERVERA ====================
+process.on('uncaughtException', (err) => {
+    console.error('❌ NEUHVAĆENA GREŠKA:', err);
+    // Server nastavlja da radi umesto da se ugasi
+});
 
+process.on('unhandledRejection', (reason) => {
+    console.error('❌ NEUHVAĆENO ODBIJANJE PROMISE-A:', reason);
+});
 // ==================== POKRETANJE ====================
 httpServer.listen(PORT, () => {
     console.log('═══════════════════════════════════════════');
