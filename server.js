@@ -489,6 +489,21 @@ const httpServer = http.createServer((req, res) => {
             });
             res.end('style.css nije pronađen');
         }
+    } else if (pathname === '/izreke.txt') {
+    const filePath = path.join(__dirname, 'public', 'izreke.txt');
+    try {
+        const txt = fs.readFileSync(filePath, 'utf8');
+        res.writeHead(200, {
+            'Content-Type': 'text/plain; charset=utf-8',
+            'Cache-Control': 'no-cache'
+        });
+        res.end(txt);
+    } catch (e) {
+        res.writeHead(404, {
+            'Content-Type': 'text/plain; charset=utf-8'
+        });
+        res.end('izreke.txt nije pronađen');
+    }
 
     } else if (pathname === '/status') {
         res.writeHead(200, {

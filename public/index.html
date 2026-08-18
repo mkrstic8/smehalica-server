@@ -121,20 +121,16 @@
             </button>
         </div>
         
-        <div class="overlay-content" id="findingScreen" style="display:none;">
-            <h2>⚡ Брза игра</h2>
-            <div class="status" id="findingStatus">Тражим противника...</div>
-            <div class="rack-container" style="margin-top:15px;">
-                <span class="rack-label">🎴 Вежбај:</span>
-                <div class="rack" id="waitingRack"></div>
-            </div>
-            <button class="btn-secondary" onclick="shuffleWaitingRack()" style="width:100%;padding:10px;margin-top:8px;">
-                🔀 ПРОМЕШАЈ
-            </button>
-            <button class="btn-danger" id="cancelFindBtn" onclick="cancelFind()" style="width:100%;padding:12px;margin-top:8px;">
-                ❌ ОТКАЖИ
-            </button>
-        </div>
+<div class="overlay-content" id="findingScreen" style="display:none;">
+    <h2>⚡ Брза игра</h2>
+    <div class="status" id="findingStatus">Тражим противника...</div>
+    <div class="proverb-container" id="proverbContainer">
+        <p class="proverb-text" id="proverbText">Учитавам изреку...</p>
+    </div>
+    <button class="btn-danger" id="cancelFindBtn" onclick="cancelFind()" style="width:100%;padding:12px;margin-top:8px;">
+        ❌ ОТКАЖИ
+    </button>
+</div>
     </div>
 
     <div class="game-container" id="gameContainer" style="display:none;">
@@ -201,7 +197,18 @@
             reconnectionAttempts: Infinity,
             timeout: 10000
         });
-
+// ==================== NARODNE IZREKE (lokalno) ====================
+const poslovice = [
+    "Боље врабац у руци него голуб на грани.",
+    "Ко рано рани, две среће граби.",
+    "Тиха вода брег рони.",
+    "Без муке се песма не испоји.",
+    "Ко другоме јаму копа, сам у њу пада.",
+    "Гвожђе се кује док је вруће.",
+    "Једна ласта не чини пролеће.",
+    "Није злато све што сија."
+    // ← ОВДЕ ДОДАЈ СВЕ СВОЈЕ ИЗРЕКЕ, сваку у наводницима са зарезом
+];
         // ==================== STANJE ====================
         let gameId = null;
         let myRack = [];
