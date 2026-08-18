@@ -1,4 +1,5 @@
 const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -94,6 +95,29 @@ const games = {};        // gameId -> gameState
 const players = {};      // playerId -> { socket, gameId, playerNum, name, disconnectTimer, ... }
 const matchmaking = new Set(); // Set igrača koji čekaju
 const rooms = {};        // linkKod -> { creatorId, createdAt }
+function generateSessionToken() {
+    return crypto.randomBytes(32).toString('hex');
+}
+
+function sanitizePlayerName(name) {
+    if (typeof name !== 'string') {
+        return 'Играч';
+    }
+
+    const clean = name
+        .normalize('NFC')
+        .replace(/[\u0000-\u001F\u007F]/g, '')
+        .trim()
+        .slice(0, 20);
+
+    return clean || 'Играч';
+}
+
+function isValidLetter(letter) {
+    return typeof letter === 'string' &&
+        letter.length === 1 &&
+        Object.prototype.hasOwnProperty.call(letterValues, letter);
+}
 
 // ==================== POMOĆNE FUNKCIJE ====================
 function createBag() {
@@ -102,7 +126,7 @@ function createBag() {
         for (let i = 0; i < count; i++) bag.push(letter);
     }
     for (let i = bag.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
+        const j = crypto.randomInt(i + 1);
         [bag[i], bag[j]] = [bag[j], bag[i]];
     }
     return bag;
@@ -131,7 +155,7 @@ function generateRoomLink() {
     const slova = 'АБВГДЂЕЖЗИЈКЛЉМНЊОПРСТЋУФХЦЧЏШ';
     let link = '';
     for (let i = 0; i < 5; i++) {
-        link += slova[Math.floor(Math.random() * slova.length)];
+        link += slova[crypto.randomInt(slova.length)];
     }
     if (rooms[link]) return generateRoomLink();
     return link;
@@ -230,8 +254,37 @@ function validateMove(game, playerId, placements) {
     const neededLetters = [...player.rack];
     const tempBoard = [];
 
-    for (const p of placements) {
-        const { row, col, letter } = p;
+for (const p of placements) {
+
+    if (!p || typeof p !== 'object') {
+        return {
+            valid: false,
+            error: 'Неисправан податак о плочици.'
+        };
+    }
+
+    const { row, col, letter } = p;
+
+    if (
+        !Number.isInteger(row) ||
+        !Number.isInteger(col) ||
+        row < 0 ||
+        row >= BOARD_SIZE ||
+        col < 0 ||
+        col >= BOARD_SIZE
+    ) {
+        return {
+            valid: false,
+            error: 'Неважећа позиција плочице.'
+        };
+    }
+
+    if (!isValidLetter(letter)) {
+        return {
+            valid: false,
+            error: 'Неважеће слово.'
+        };
+    }
         if (row < 0 || row >= BOARD_SIZE || col < 0 || col >= BOARD_SIZE) {
             return { valid: false, error: `Неважећа позиција [${row+1},${col+1}].` };
         }
@@ -549,15 +602,44 @@ const io = new Server(httpServer, {
 
 // ==================== MIDDLEWARE ZA IGRAČE ====================
 io.use((socket, next) => {
-    const authPlayerId = socket.handshake.auth.playerId;
-    let playerId;
-    if (authPlayerId && players[authPlayerId]) {
-        playerId = authPlayerId;
-    } else {
-        playerId = authPlayerId || uuidv4();
+    try {
+        const auth = socket.handshake.auth || {};
+        const sessionToken =
+            typeof auth.sessionToken === 'string'
+                ? auth.sessionToken
+                : null;
+
+        let playerId = null;
+
+        // Постојећи играч — идентификује се session token-ом,
+        // а НЕ playerId-јем који клијент сам задаје.
+        if (sessionToken) {
+            for (const [id, player] of Object.entries(players)) {
+                if (
+                    player.sessionToken &&
+                    player.sessionToken === sessionToken
+                ) {
+                    playerId = id;
+                    break;
+                }
+            }
+        }
+
+        // Нови играч
+        if (!playerId) {
+            playerId = uuidv4();
+            socket.data.isNewPlayer = true;
+        } else {
+            socket.data.isNewPlayer = false;
+        }
+
+        socket.data.playerId = playerId;
+
+        next();
+    } catch (err) {
+        console.error('❌ Auth middleware greška:', err);
+        next(new Error('Аутентификација није успела.'));
     }
-    socket.data.playerId = playerId;
-    next();
 });
 
 // ==================== KONEKCIJA ====================
@@ -591,20 +673,26 @@ io.on('connection', (socket) => {
 
         console.log(`🔁 Igrač se ponovo povezao: ${playerId.substring(0,8)}`);
     } else {
-        players[playerId] = {
-            socket: socket,
-            gameId: null,
-            playerNum: null,
-            name: 'Играч',
-            disconnectTimer: null,
-            lastCancelTime: 0, 
-            roomLink: null          // <-- DODATO: prati koju sobu igrač trenutno drži otvorenu     // <-- DODAJ OVO
-        };
+            players[playerId] = {
+                socket: socket,
+                sessionToken: generateSessionToken(),
+                gameId: null,
+                playerNum: null,
+                name: 'Играч',
+                disconnectTimer: null,
+                lastCancelTime: 0,
+                roomLink: null,
+                lastChatTime: 0,
+                lastTypingTime: 0,
+                lastRematchTime: 0,
+                rematchRequestedBy: null
+            };
     }
 
     // Pošalji potvrdu sa playerId
     socket.emit('connected', {
         playerId: playerId,
+        sessionToken: players[playerId].sessionToken,
         message: 'Повезан/а на сервер Смехалице!'
     });
 
@@ -651,15 +739,33 @@ io.on('connection', (socket) => {
             socket.emit('game_over', state);
         }
     }
+    function sanitizePlayerName(name) {
+    if (typeof name !== 'string') {
+        return 'Играч';
+    }
+
+    const clean = name
+        .normalize('NFC')
+        .replace(/[\u0000-\u001F\u007F]/g, '')
+        .trim()
+        .slice(0, 20);
+
+    return clean || 'Играч';
+}
 
     // ---------- EVENTI ----------
-    socket.on('set_name', (data) => {
-        if (players[playerId]) {
-            players[playerId].name = data.name || 'Играч';
-            socket.emit('name_set', { name: players[playerId].name });
-        }
-    });
+    
+socket.on('set_name', (data) => {
+    const player = players[playerId];
 
+    if (!player) return;
+
+    player.name = sanitizePlayerName(data?.name);
+
+    socket.emit('name_set', {
+        name: player.name
+    });
+});
     socket.on('create_room', () => {
         handleCreateRoom(socket, playerId);
     });
@@ -696,12 +802,21 @@ io.on('connection', (socket) => {
         handleChat(socket, playerId, data.text);
     });
 
-    socket.on('typing', () => {
-        const p = players[playerId];
-        if (p && p.gameId) {
-            socket.to(p.gameId).emit('opponent_typing');
-        }
-    });
+socket.on('typing', () => {
+    const p = players[playerId];
+
+    if (!p || !p.gameId) return;
+
+    const now = Date.now();
+
+    if (now - p.lastTypingTime < 700) {
+        return;
+    }
+
+    p.lastTypingTime = now;
+
+    socket.to(p.gameId).emit('opponent_typing');
+});
 
     socket.on('request_rematch', () => {
         handleRematchRequest(socket, playerId);
@@ -958,10 +1073,16 @@ function handleCancelFind(socket, playerId) {
 }
 */
 function handlePlaceTiles(socket, playerId, placements) {
-    if (!Array.isArray(placements)) {
-        socket.emit('error', { message: 'Неисправан формат потеза.' });
-        return;
-    }
+    if (
+    !Array.isArray(placements) ||
+    placements.length < 1 ||
+    placements.length > 8
+) {
+    socket.emit('error', {
+        message: 'Неисправан број плочица.'
+    });
+    return;
+}
     const player = players[playerId];
     if (!player || !player.gameId) {
         socket.emit('error', { message: 'Ниси у игри.' });
@@ -1133,8 +1254,20 @@ function handleChat(socket, playerId, text) {
     if (typeof text !== 'string' || text.trim().length === 0) return;
 
     const player = players[playerId];
-    if (!player || !player.gameId) return;
+    const now = Date.now();
+
+if (now - player.lastChatTime < 700) {
+    socket.emit('error', {
+        message: 'Сачекај мало пре слања следеће поруке.'
+    });
+    return;
+}
+
+player.lastChatTime = now;
+    //if (!player || !player.gameId) return;
+
     const game = games[player.gameId];
+
     if (!game) return;
 
     const message = {
@@ -1158,62 +1291,179 @@ function handleChat(socket, playerId, text) {
 
 function handleRematchRequest(socket, playerId) {
     const player = players[playerId];
+
     if (!player || !player.gameId) return;
+
     const game = games[player.gameId];
+
     if (!game || game.status !== 'finished') return;
 
-    const opponentId = Object.keys(game.players).find(id => id !== playerId);
+    const now = Date.now();
+
+    if (now - player.lastRematchTime < 3000) {
+        socket.emit('error', {
+            message: 'Сачекај мало пре новог захтева за реванш.'
+        });
+        return;
+    }
+
+    const opponentId = Object.keys(game.players)
+        .find(id => id !== playerId);
+
     if (!opponentId || !players[opponentId]) return;
+
+    player.lastRematchTime = now;
+
+    game.rematchRequestedBy = playerId;
 
     sendToPlayer(opponentId, 'rematch_request', {
         fromId: playerId,
         fromName: player.name,
         message: `${player.name} жели реванш!`
     });
-    socket.emit('rematch_sent', { message: 'Захтев за реванш је послат.' });
-    console.log(`🔄 ${player.name} traži revanš od ${players[opponentId].name}`);
-}
 
+    socket.emit('rematch_sent', {
+        message: 'Захтев за реванш је послат.'
+    });
+
+    console.log(
+        `🔄 ${player.name} traži revanš od ${players[opponentId].name}`
+    );
+}
 function handleAcceptRematch(socket, playerId, fromId) {
     const player = players[playerId];
-    if (!player) return;
-    const opponent = players[fromId];
-    if (!opponent || !opponent.gameId) {
-        socket.emit('error', { message: 'Противник више није доступан.' });
+
+    if (!player || !player.gameId) {
+        socket.emit('error', {
+            message: 'Ниси у завршеној игри.'
+        });
         return;
     }
-    const oldGame = games[opponent.gameId];
-    if (!oldGame || oldGame.status !== 'finished') return;
-    if (oldGame.rematchStarted) return; // sprečava dupli rematch
+
+    const oldGame = games[player.gameId];
+
+    if (!oldGame || oldGame.status !== 'finished') {
+        socket.emit('error', {
+            message: 'Реванш више није доступан.'
+        });
+        return;
+    }
+
+    const opponentId = Object.keys(oldGame.players)
+        .find(id => id !== playerId);
+
+    if (!opponentId) {
+        socket.emit('error', {
+            message: 'Противник није пронађен.'
+        });
+        return;
+    }
+
+    // КРИТИЧНА ПРОВЕРА:
+    // fromId мора бити стварни противник у овој игри.
+    if (fromId !== opponentId) {
+        socket.emit('error', {
+            message: 'Неважећи захтев за реванш.'
+        });
+        return;
+    }
+
+    // Мора постојати активан захтев
+    if (oldGame.rematchRequestedBy !== fromId) {
+        socket.emit('error', {
+            message: 'Нема активног захтева за реванш.'
+        });
+        return;
+    }
+
+    if (oldGame.rematchStarted) {
+        return;
+    }
+
     oldGame.rematchStarted = true;
 
-    const newGame = createGame(fromId, playerId);
-    const state1 = getGameState(newGame, fromId);
+    const opponent = players[opponentId];
+
+    if (!opponent) {
+        socket.emit('error', {
+            message: 'Противник више није доступан.'
+        });
+        oldGame.rematchStarted = false;
+        return;
+    }
+
+    const newGame = createGame(opponentId, playerId);
+
+    const state1 = getGameState(newGame, opponentId);
     state1.type = 'game_start';
     state1.opponentName = player.name;
     state1.yourPlayerNum = 1;
     state1.isRematch = true;
-    sendToPlayer(fromId, 'game_start', state1);
+
+    sendToPlayer(
+        opponentId,
+        'game_start',
+        state1
+    );
 
     const state2 = getGameState(newGame, playerId);
     state2.type = 'game_start';
     state2.opponentName = opponent.name;
     state2.yourPlayerNum = 2;
     state2.isRematch = true;
-    sendToPlayer(playerId, 'game_start', state2);
 
+    sendToPlayer(
+        playerId,
+        'game_start',
+        state2
+    );
+
+    // Стару игру више не користимо.
     delete games[oldGame.id];
+
     console.log(`🔄 Revanš prihvaćen: ${newGame.id}`);
 }
 
 function handleDeclineRematch(socket, playerId, fromId) {
-    const opponent = players[fromId];
-    if (!opponent) return;
-    sendToPlayer(fromId, 'rematch_declined', { message: `${players[playerId].name} је одбио реванш.` });
-    socket.emit('rematch_declined', { message: 'Одбио/ла си реванш.' });
-    console.log(`❌ ${players[playerId].name} odbija revanš`);
-}
+    const player = players[playerId];
 
+    if (!player || !player.gameId) return;
+
+    const game = games[player.gameId];
+
+    if (!game || game.status !== 'finished') return;
+
+    const opponentId = Object.keys(game.players)
+        .find(id => id !== playerId);
+
+    if (fromId !== opponentId) {
+        socket.emit('error', {
+            message: 'Неважећи захтев.'
+        });
+        return;
+    }
+
+    if (game.rematchRequestedBy !== fromId) {
+        socket.emit('error', {
+            message: 'Нема активног захтева за реванш.'
+        });
+        return;
+    }
+
+    game.rematchRequestedBy = null;
+
+    sendToPlayer(fromId, 'rematch_declined', {
+        message: `${player.name} је одбио реванш.`
+    });
+
+    socket.emit('rematch_declined', {
+        message: 'Одбио/ла си реванш.'
+    });
+
+    console.log(
+        `❌ ${player.name} odbija revanš`
+    );
+}
 function handleLeaveGame(socket, playerId) {
     const player = players[playerId];
     if (!player || !player.gameId) return;

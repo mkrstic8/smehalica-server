@@ -188,10 +188,13 @@
         
         // Trajni playerId i playerName
         let playerId = localStorage.getItem('smehalica_playerId');
+        let sessionToken = localStorage.getItem('smehalica_sessionToken');
         let myName = localStorage.getItem('smehalica_playerName') || 'Играч';
-        let chatHistory = [];
+
         const socket = io(SERVER_URL, {
-            auth: { playerId },
+            auth: {
+                sessionToken: sessionToken || null
+            },
             reconnection: true,
             reconnectionDelay: 1000,
             reconnectionAttempts: Infinity,
@@ -380,11 +383,22 @@
             gameActive = false;
         });
 
-        socket.on('connected', (data) => {
-            playerId = data.playerId;
-            localStorage.setItem('smehalica_playerId', playerId);
-            console.log('🔑 Moj playerId:', playerId);
-        });
+socket.on('connected', (data) => {
+    playerId = data.playerId;
+    sessionToken = data.sessionToken;
+
+    localStorage.setItem(
+        'smehalica_playerId',
+        playerId
+    );
+
+    localStorage.setItem(
+        'smehalica_sessionToken',
+        sessionToken
+    );
+
+    console.log('🔑 Играч повезан');
+});
 
         socket.on('error', (data) => {
             console.error('Server greška:', data.message);
@@ -1035,29 +1049,69 @@
         }
 
         function showRematchRequest(msg) {
-            hideRematchRequest();
-            const overlay = document.createElement('div');
-            overlay.id = 'rematchOverlay';
-            overlay.className = 'overlay';
-            overlay.innerHTML = `
-                <div class="overlay-content">
-                    <h2>🔄 Реванш?</h2>
-                    <p style="margin-bottom:15px;"><strong>${msg.fromName}</strong> жели реванш!</p>
-                    <button class="btn-success" id="acceptRematchBtn" style="width:100%;padding:12px;margin-bottom:8px;">✅ ПРИХВАТИ</button>
-                    <button class="btn-danger" id="declineRematchBtn" style="width:100%;padding:12px;">❌ ОДБИЈ</button>
-                </div>
-            `;
-            document.body.appendChild(overlay);
-            document.getElementById('acceptRematchBtn').onclick = () => {
-                sendMessage('accept_rematch', { fromId: msg.fromId });
-                hideRematchRequest();
-                successMsg('🔄 Реванш прихваћен!');
-            };
-            document.getElementById('declineRematchBtn').onclick = () => {
-                sendMessage('decline_rematch', { fromId: msg.fromId });
-                hideRematchRequest();
-            };
-        }
+    hideRematchRequest();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'rematchOverlay';
+    overlay.className = 'overlay';
+
+    const content = document.createElement('div');
+    content.className = 'overlay-content';
+
+    const title = document.createElement('h2');
+    title.textContent = '🔄 Реванш?';
+
+    const message = document.createElement('p');
+    message.style.marginBottom = '15px';
+
+    const name = document.createElement('strong');
+    name.textContent = msg.fromName || 'Противник';
+
+    message.appendChild(name);
+    message.appendChild(
+        document.createTextNode(' жели реванш!')
+    );
+
+    const acceptBtn = document.createElement('button');
+    acceptBtn.className = 'btn-success';
+    acceptBtn.id = 'acceptRematchBtn';
+    acceptBtn.style.width = '100%';
+    acceptBtn.style.padding = '12px';
+    acceptBtn.style.marginBottom = '8px';
+    acceptBtn.textContent = '✅ ПРИХВАТИ';
+
+    const declineBtn = document.createElement('button');
+    declineBtn.className = 'btn-danger';
+    declineBtn.id = 'declineRematchBtn';
+    declineBtn.style.width = '100%';
+    declineBtn.style.padding = '12px';
+    declineBtn.textContent = '❌ ОДБИЈ';
+
+    content.appendChild(title);
+    content.appendChild(message);
+    content.appendChild(acceptBtn);
+    content.appendChild(declineBtn);
+
+    overlay.appendChild(content);
+    document.body.appendChild(overlay);
+
+    acceptBtn.onclick = () => {
+        sendMessage('accept_rematch', {
+            fromId: msg.fromId
+        });
+
+        hideRematchRequest();
+        successMsg('🔄 Реванш прихваћен!');
+    };
+
+    declineBtn.onclick = () => {
+        sendMessage('decline_rematch', {
+            fromId: msg.fromId
+        });
+
+        hideRematchRequest();
+    };
+}
 
         function hideRematchRequest() {
             const overlay = document.getElementById('rematchOverlay');
