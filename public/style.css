@@ -535,6 +535,22 @@ button:disabled {
   pointer-events: none;
   animation: particleFly 1s ease-out forwards;
 }
+.proverb-container {
+    margin: 15px auto;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+    max-width: 90%;
+    text-align: center;
+}
+
+.proverb-text {
+    font-style: italic;
+    color: #ffffff;
+    font-size: 1rem;
+    line-height: 1.5;
+    margin: 0;
+}
 
 @media (max-width: 600px) {
   h1 { font-size: 1.2rem; }
