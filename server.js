@@ -2,6 +2,7 @@ const { v4: uuidv4 } = require('uuid');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const url = require('url');
 const { Server } = require('socket.io');
 
 // ==================== KONFIGURACIJA ====================
@@ -444,13 +445,19 @@ function validateMove(game, playerId, placements) {
 
 // ==================== SOCKET.IO SERVER ====================
 const httpServer = http.createServer((req, res) => {
-    if (req.url === '/' || req.url === '/index.html') {
+    const pathname = url.parse(req.url).pathname;
+
+    if (pathname === '/' || pathname === '/index.html') {
         const filePath = path.join(__dirname, 'public', 'index.html');
 
         try {
             const html = fs.readFileSync(filePath, 'utf8');
             res.writeHead(200, {
-                'Content-Type': 'text/html; charset=utf-8'
+                'Content-Type': 'text/html; charset=utf-8',
+                'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0',
+                'Surrogate-Control': 'no-store'
             });
             res.end(html);
         } catch (e) {
@@ -464,13 +471,16 @@ const httpServer = http.createServer((req, res) => {
             }));
         }
 
-    } else if (req.url === '/style.css') {
+    } else if (pathname === '/style.css') {
         const filePath = path.join(__dirname, 'public', 'style.css');
 
         try {
             const css = fs.readFileSync(filePath, 'utf8');
             res.writeHead(200, {
-                'Content-Type': 'text/css; charset=utf-8'
+                'Content-Type': 'text/css; charset=utf-8',
+                'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
             });
             res.end(css);
         } catch (e) {
@@ -480,7 +490,7 @@ const httpServer = http.createServer((req, res) => {
             res.end('style.css nije pronađen');
         }
 
-    } else if (req.url === '/status') {
+    } else if (pathname === '/status') {
         res.writeHead(200, {
             'Content-Type': 'application/json; charset=utf-8'
         });
