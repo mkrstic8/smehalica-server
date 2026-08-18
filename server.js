@@ -502,6 +502,9 @@ const httpServer = http.createServer((req, res) => {
             dictionarySize: DICTIONARY.size,
             waitingPlayers: matchmaking.size
         }));
+     } else if (pathname === '/favicon.ico') {
+        res.writeHead(204);
+        res.end();
 
     } else {
         res.writeHead(404, {
