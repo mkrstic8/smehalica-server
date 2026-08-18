@@ -197,18 +197,7 @@
             reconnectionAttempts: Infinity,
             timeout: 10000
         });
-// ==================== NARODNE IZREKE (lokalno) ====================
-const poslovice = [
-    "Боље врабац у руци него голуб на грани.",
-    "Ко рано рани, две среће граби.",
-    "Тиха вода брег рони.",
-    "Без муке се песма не испоји.",
-    "Ко другоме јаму копа, сам у њу пада.",
-    "Гвожђе се кује док је вруће.",
-    "Једна ласта не чини пролеће.",
-    "Није злато све што сија."
-    // ← ОВДЕ ДОДАЈ СВЕ СВОЈЕ ИЗРЕКЕ, сваку у наводницима са зарезом
-];
+
         // ==================== STANJE ====================
         let gameId = null;
         let myRack = [];
@@ -219,8 +208,32 @@ const poslovice = [
         let gameIsOver = false;
         let lastMoveCells = [];
         let currentBoardState = null;
-        let waitingRack = [];
         let myRoomLink = null;
+
+
+        // ==================== СРПСКЕ ИЗРЕКЕ ====================
+        let poslovice = [];
+
+        async function ucitajIzreke() {
+            try {
+                const response = await fetch('izreke.txt');
+
+                if (!response.ok) {
+                    throw new Error('Фајл izreke.txt није пронађен');
+                }
+
+                const text = await response.text();
+
+                poslovice = text
+                    .split(/\r?\n/)
+                    .map(izreka => izreka.trim())
+                    .filter(izreka => izreka.length > 0);
+
+                console.log(`✅ Учитано изрека: ${poslovice.length}`);
+            } catch (error) {
+                console.error('❌ Грешка при учитавању изрека:', error);
+            }
+        }
 
         const letterValues = {
             'А':1,'Б':3,'В':2,'Г':3,'Д':2,'Ђ':8,'Е':1,'Ж':5,'З':3,
@@ -565,16 +578,26 @@ const poslovice = [
             showScreen('optionsScreen');
         }
         
-        function quickMatch() {
+        async function quickMatch() {
             document.getElementById('optionsScreen').style.display = 'none';
             document.getElementById('findingScreen').style.display = 'block';
             showScreen('findingScreen');
-            waitingRack = [];
-            const allLetters = 'АБВГДЂЕЖЗИЈКЛЉМНЊОПРСТЋУФХЦЧЏШ';
-            for (let i = 0; i < 8; i++) {
-                waitingRack.push(allLetters[Math.floor(Math.random() * allLetters.length)]);
+
+            // Учитај изреке
+            if (poslovice.length === 0) {
+                await ucitajIzreke();
             }
-            renderWaitingRack();
+
+            // Прикажи насумичну изреку
+            if (poslovice.length > 0) {
+                const randomIzreka =
+                    poslovice[Math.floor(Math.random() * poslovice.length)];
+
+                document.getElementById('proverbText').textContent =
+                    '💬 ' + randomIzreka;
+            }
+
+            // Тражи противника
             sendMessage('quick_match');
         }
         
@@ -615,32 +638,10 @@ const poslovice = [
             showScreen('optionsScreen');
             myRoomLink = null;
             }   
-        
-        function renderWaitingRack() {
-            const rackEl = document.getElementById('waitingRack');
-            if (!rackEl) return;
-            rackEl.innerHTML = '';
-            waitingRack.forEach(letter => {
-                const tile = document.createElement('div');
-                tile.className = 'tile';
-                tile.textContent = letter;
-                tile.style.cursor = 'default';
-                rackEl.appendChild(tile);
-            });
-        }
-        
-        function shuffleWaitingRack() {
-            for (let i = waitingRack.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [waitingRack[i], waitingRack[j]] = [waitingRack[j], waitingRack[i]];
-            }
-            renderWaitingRack();
-        }
 
         function cancelFind() {
             sendMessage('cancel_find');
             showScreen('optionsScreen');
-            waitingRack = [];
         }
 
         function startGame(msg, isResume = false) {
