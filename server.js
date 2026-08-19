@@ -630,8 +630,8 @@ const httpServer = http.createServer((req, res) => {
 
 // ==================== ZAŠTITA OD MASOVNIH KONEKCIJA (DoS) ====================
 // Podesivi limiti - po potrebi promeni na osnovu stvarnog saobraćaja.
-const MAX_CONCURRENT_PER_IP = 20;     // koliko ISTOVREMENIH konekcija sme jedna IP adresa da drži
-const MAX_NEW_CONN_PER_WINDOW = 30;   // koliko NOVIH konekcija jedna IP sme da otvori u prozoru ispod
+const MAX_CONCURRENT_PER_IP = 10;     // koliko ISTOVREMENIH konekcija sme jedna IP adresa da drži
+const MAX_NEW_CONN_PER_WINDOW = 10;   // koliko NOVIH konekcija jedna IP sme da otvori u prozoru ispod
 const CONN_WINDOW_MS = 60 * 1000;     // dužina tog prozora (60s)
 const MAX_TOTAL_CONCURRENT = 500;     // globalni maksimum konekcija na server, bez obzira na IP
 
