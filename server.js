@@ -477,7 +477,7 @@ for (const p of placements) {
         totalScore += wordScore * wordMultiplier;
     }
 
-    if (tempBoard.length === 7) totalScore += 50; // BINGO bonus
+    if (tempBoard.length === 8) totalScore += 50; // BINGO bonus
 
     // Finalizuj — ukloni isNewlyPlaced flag
     for (const p of tempBoard) {
