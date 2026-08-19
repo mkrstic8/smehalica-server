@@ -630,8 +630,8 @@ const httpServer = http.createServer((req, res) => {
 
 // ==================== ZAŠTITA OD MASOVNIH KONEKCIJA (DoS) ====================
 // Podesivi limiti - po potrebi promeni na osnovu stvarnog saobraćaja.
-const MAX_CONCURRENT_PER_IP = 10;     // koliko ISTOVREMENIH konekcija sme jedna IP adresa da drži
-const MAX_NEW_CONN_PER_WINDOW = 10;   // koliko NOVIH konekcija jedna IP sme da otvori u prozoru ispod
+const MAX_CONCURRENT_PER_IP = 20;     // koliko ISTOVREMENIH konekcija sme jedna IP adresa da drži
+const MAX_NEW_CONN_PER_WINDOW = 30;   // koliko NOVIH konekcija jedna IP sme da otvori u prozoru ispod
 const CONN_WINDOW_MS = 60 * 1000;     // dužina tog prozora (60s)
 const MAX_TOTAL_CONCURRENT = 500;     // globalni maksimum konekcija na server, bez obzira na IP
 
@@ -709,30 +709,11 @@ const io = new Server(httpServer, {
     pingInterval: 25000
 });
 
-// ==================== MIDDLEWARE ZA OGRANIČENJE KONEKCIJA ====================
-// Ide PRE auth middleware-a namerno: jeftina provera prva, da se zloupotreba
-// odbije pre skupljeg pretraživanja svih igrača radi sessionToken-a ispod.
-io.use((socket, next) => {
-    const ip = getClientIp(socket);
-    socket.data.clientIp = ip;
-
-    if (io.engine.clientsCount >= MAX_TOTAL_CONCURRENT) {
-        return next(new Error('Server je trenutno pun. Pokušaj ponovo za koji minut.'));
-    }
-
-    const currentForIp = connectionsByIp.get(ip);
-    if (currentForIp && currentForIp.size >= MAX_CONCURRENT_PER_IP) {
-        return next(new Error('Previše aktivnih konekcija sa ove adrese.'));
-    }
-
-    if (isRateLimited(ip)) {
-        return next(new Error('Previše pokušaja povezivanja. Sačekaj malo pa probaj ponovo.'));
-    }
-
-    next();
-});
-
-// ==================== MIDDLEWARE ZA IGRAČE ====================
+// ==================== MIDDLEWARE ZA IGRAČE (identitet) ====================
+// Ide PRE limita konekcija namerno: mora prvo da se zna da li je poznat
+// igrač (validan sessionToken), da limit ispod ne bi blokirao NJEGOVE
+// legitimne pokušaje rekonekcije (npr. mobilna aplikacija posle izlaska
+// u pozadinu i gubitka konekcije).
 io.use((socket, next) => {
     try {
         const auth = socket.handshake.auth || {};
@@ -772,6 +753,36 @@ io.use((socket, next) => {
         console.error('❌ Auth middleware greška:', err);
         next(new Error('Аутентификација није успела.'));
     }
+});
+
+// ==================== MIDDLEWARE ZA OGRANIČENJE KONEKCIJA ====================
+// Globalni limit važi za SVE (novi i poznati igrači) - to je čista zaštita
+// kapaciteta servera. Po-IP limiti (broj istovremenih / brzina novih
+// pokušaja) važe SAMO za NOVE igrače (bez prepoznatog sessionToken-a) -
+// to je stvarni DoS vektor koji ograničavamo (skriptovano pravljenje
+// beskonačno novih zapisa u memoriji). Igrač koji se VRAĆA sa validnim
+// tokenom (npr. telefon posle izlaska iz aplikacije) se NE odbija ovim -
+// on ne pravi nov zapis, samo nastavlja postojeću partiju.
+io.use((socket, next) => {
+    const ip = getClientIp(socket);
+    socket.data.clientIp = ip;
+
+    if (io.engine.clientsCount >= MAX_TOTAL_CONCURRENT) {
+        return next(new Error('Server je trenutno pun. Pokušaj ponovo za koji minut.'));
+    }
+
+    if (socket.data.isNewPlayer) {
+        const currentForIp = connectionsByIp.get(ip);
+        if (currentForIp && currentForIp.size >= MAX_CONCURRENT_PER_IP) {
+            return next(new Error('Previše aktivnih konekcija sa ove adrese.'));
+        }
+
+        if (isRateLimited(ip)) {
+            return next(new Error('Previše pokušaja povezivanja. Sačekaj malo pa probaj ponovo.'));
+        }
+    }
+
+    next();
 });
 
 // ==================== KONEKCIJA ====================
