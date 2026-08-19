@@ -704,17 +704,17 @@ socket.io.on('reconnect', () => {
             // Ako smo propustili live 'move_result' (npr. veza je pala usred poteza),
             // javi u čet šta je poslednje odigrano - podatak je uvek u msg.lastMove.
 
-if (msg.lastMove && msg.lastMove.words && msg.lastMove.words.length > 0) {
-    const isMyLastMove = msg.lastMove.playerId === playerId;
-    if (isMyLastMove) {
-        addChatSystemMsg(`🎯 Ти играш: ${msg.lastMove.words.join(', ')} (+${msg.lastMove.score})`);
-    } else {
-        addChatSystemMsg(`${msg.opponentName || 'Противник'} игра: ${msg.lastMove.words.join(', ')} (+${msg.lastMove.score})`);
-    }
-}
+            if (msg.lastMove && msg.lastMove.words && msg.lastMove.words.length > 0) {
+                const isMyLastMove = msg.lastMove.playerId === playerId;
+                if (isMyLastMove) {
+                    addChatSystemMsg(`🎯 Ти играш: ${msg.lastMove.words.join(', ')} (+${msg.lastMove.score})`);
+                } else {
+                    addChatSystemMsg(`${msg.opponentName || 'Противник'} игра: ${msg.lastMove.words.join(', ')} (+${msg.lastMove.score})`);
+                }
+            }
 
 
-            highlightRack();
+
         }
         function updateGameState(msg) {
             if (msg.board) renderBoardFromState(msg.board);
@@ -884,274 +884,274 @@ if (msg.lastMove && msg.lastMove.words && msg.lastMove.words.length > 0) {
 
         // ==================== INTERAKCIJE ====================
 
-function animateCell(row, col, animation = 'bounce') {
-    const cell = document.querySelector(
-        `.cell[data-row="${row}"][data-col="${col}"]`
-    );
+    function animateCell(row, col, animation = 'bounce') {
+        const cell = document.querySelector(
+            `.cell[data-row="${row}"][data-col="${col}"]`
+        );
 
-    if (!cell) return;
+        if (!cell) return;
 
-    // Ukloni prethodnu animaciju ako postoji
-    cell.classList.remove('cell-bounce', 'cell-shake');
+        // Ukloni prethodnu animaciju ako postoji
+        cell.classList.remove('cell-bounce', 'cell-shake');
 
-    // Omogući ponovno pokretanje iste animacije
-    void cell.offsetWidth;
+        // Omogući ponovno pokretanje iste animacije
+        void cell.offsetWidth;
 
-    if (animation === 'shake') {
-        cell.classList.add('cell-shake');
+        if (animation === 'shake') {
+            cell.classList.add('cell-shake');
 
-        setTimeout(() => {
-            cell.classList.remove('cell-shake');
-        }, 400);
+            setTimeout(() => {
+                cell.classList.remove('cell-shake');
+            }, 400);
 
-    } else {
-        cell.classList.add('cell-bounce');
+        } else {
+            cell.classList.add('cell-bounce');
 
-        setTimeout(() => {
-            cell.classList.remove('cell-bounce');
-        }, 300);
+            setTimeout(() => {
+                cell.classList.remove('cell-bounce');
+            }, 300);
+        }
     }
-}
-// ==================== KONFETE ====================
+    // ==================== KONFETE ====================
 
-function spawnConfetti() {
-    const container = document.createElement('div');
+    function spawnConfetti() {
+        const container = document.createElement('div');
 
-    container.className = 'confetti-container';
+        container.className = 'confetti-container';
 
-    Object.assign(container.style, {
-        position: 'fixed',
-        inset: '0',
-        pointerEvents: 'none',
-        overflow: 'hidden',
-        zIndex: '99999'
-    });
-
-    document.body.appendChild(container);
-
-    const pieces = 80;
-
-    for (let i = 0; i < pieces; i++) {
-        const piece = document.createElement('div');
-
-        piece.className = 'confetti-piece';
-
-        const size = 6 + Math.random() * 7;
-        const left = Math.random() * 100;
-        const duration = 1.5 + Math.random() * 2;
-        const delay = Math.random() * 0.5;
-        const rotation = Math.random() * 360;
-
-        Object.assign(piece.style, {
-            position: 'absolute',
-            left: `${left}%`,
-            top: '-20px',
-            width: `${size}px`,
-            height: `${size * 1.5}px`,
-            background: `hsl(${Math.random() * 360}, 80%, 60%)`,
-            transform: `rotate(${rotation}deg)`,
-            animation: `confettiFall ${duration}s ease-out ${delay}s forwards`
+        Object.assign(container.style, {
+            position: 'fixed',
+            inset: '0',
+            pointerEvents: 'none',
+            overflow: 'hidden',
+            zIndex: '99999'
         });
 
-        container.appendChild(piece);
-    }
+        document.body.appendChild(container);
 
-    setTimeout(() => {
-        container.remove();
-    }, 4500);
-}
-        function onRackClick(index) {
-            if (!isMyTurn || !gameActive || gameIsOver) return;
-            selectedTileIndex = (selectedTileIndex === index) ? null : index;
-            renderMyRack();
+        const pieces = 80;
+
+        for (let i = 0; i < pieces; i++) {
+            const piece = document.createElement('div');
+
+            piece.className = 'confetti-piece';
+
+            const size = 6 + Math.random() * 7;
+            const left = Math.random() * 100;
+            const duration = 1.5 + Math.random() * 2;
+            const delay = Math.random() * 0.5;
+            const rotation = Math.random() * 360;
+
+            Object.assign(piece.style, {
+                position: 'absolute',
+                left: `${left}%`,
+                top: '-20px',
+                width: `${size}px`,
+                height: `${size * 1.5}px`,
+                background: `hsl(${Math.random() * 360}, 80%, 60%)`,
+                transform: `rotate(${rotation}deg)`,
+                animation: `confettiFall ${duration}s ease-out ${delay}s forwards`
+            });
+
+            container.appendChild(piece);
         }
 
-        function onCellClick(row, col) {
-            if (!isMyTurn || !gameActive || gameIsOver) {
-                setMessage('⏳ Није твој потез!', 'error');
-                return;
+        setTimeout(() => {
+            container.remove();
+        }, 4500);
+    }
+    function onRackClick(index) {
+                if (!isMyTurn || !gameActive || gameIsOver) return;
+                selectedTileIndex = (selectedTileIndex === index) ? null : index;
+                renderMyRack();
             }
-            const boardState = currentBoardState;
-            const isOccupiedPermanently = boardState && boardState[row] && boardState[row][col];
-            const isNewlyPlacedByMe = newlyPlacedCells.some(p => p.row === row && p.col === col);
 
-            if (selectedTileIndex === null) {
+    function onCellClick(row, col) {
+                if (!isMyTurn || !gameActive || gameIsOver) {
+                    setMessage('⏳ Није твој потез!', 'error');
+                    return;
+                }
+                const boardState = currentBoardState;
+                const isOccupiedPermanently = boardState && boardState[row] && boardState[row][col];
+                const isNewlyPlacedByMe = newlyPlacedCells.some(p => p.row === row && p.col === col);
+
+                if (selectedTileIndex === null) {
+                    if (isNewlyPlacedByMe) {
+                        const existingIdx = newlyPlacedCells.findIndex(p => p.row === row && p.col === col);
+                        if (existingIdx >= 0) {
+                            myRack.push(newlyPlacedCells[existingIdx].letter);
+                            newlyPlacedCells.splice(existingIdx, 1);
+                            renderBoardFromState(boardState);
+                            renderMyRack();
+                            quickMsg('↩ Плочица враћена на таблу.');
+                        }
+                    } else if (isOccupiedPermanently) {
+                        errorMsg('⚠ То поље је већ заузето.');
+                    } else {
+                        errorMsg('👆 Прво изабери плочицу са табле!');
+                    }
+                    return;
+                }
+                if (isOccupiedPermanently && !isNewlyPlacedByMe) {
+                    errorMsg('⚠ То поље је већ заузето.');
+                    return;
+                }
                 if (isNewlyPlacedByMe) {
                     const existingIdx = newlyPlacedCells.findIndex(p => p.row === row && p.col === col);
                     if (existingIdx >= 0) {
                         myRack.push(newlyPlacedCells[existingIdx].letter);
                         newlyPlacedCells.splice(existingIdx, 1);
-                        renderBoardFromState(boardState);
-                        renderMyRack();
-                        quickMsg('↩ Плочица враћена на таблу.');
                     }
-                } else if (isOccupiedPermanently) {
-                    errorMsg('⚠ То поље је већ заузето.');
-                } else {
-                    errorMsg('👆 Прво изабери плочицу са табле!');
                 }
-                return;
+                const letter = myRack[selectedTileIndex];
+                newlyPlacedCells.push({ row, col, letter });
+                myRack.splice(selectedTileIndex, 1);
+                selectedTileIndex = null;
+                renderBoardFromState(boardState);
+                renderMyRack();
+                sfxPlace();
+                animateCell(row, col, 'bounce');
+                successMsg(`✅ Постављено "${letter}" (${letterValues[letter] || 0} поен${letterValues[letter] === 1 ? '' : 'а'}).`);
             }
-            if (isOccupiedPermanently && !isNewlyPlacedByMe) {
-                errorMsg('⚠ То поље је већ заузето.');
-                return;
-            }
-            if (isNewlyPlacedByMe) {
-                const existingIdx = newlyPlacedCells.findIndex(p => p.row === row && p.col === col);
-                if (existingIdx >= 0) {
-                    myRack.push(newlyPlacedCells[existingIdx].letter);
-                    newlyPlacedCells.splice(existingIdx, 1);
+
+    function recallTiles() {
+                if (!isMyTurn || !gameActive || gameIsOver) return;
+                if (newlyPlacedCells.length === 0) {
+                    quickMsg('ℹ Нема новопостављених плочица.');
+                    return;
                 }
+                for (const p of [...newlyPlacedCells]) myRack.push(p.letter);
+                newlyPlacedCells = [];
+                selectedTileIndex = null;
+                renderBoardFromState(currentBoardState);
+                renderMyRack();
+                quickMsg('↩ Све плочице враћене на таблу.');
             }
-            const letter = myRack[selectedTileIndex];
-            newlyPlacedCells.push({ row, col, letter });
-            myRack.splice(selectedTileIndex, 1);
-            selectedTileIndex = null;
-            renderBoardFromState(boardState);
-            renderMyRack();
-            sfxPlace();
-            animateCell(row, col, 'bounce');
-            successMsg(`✅ Постављено "${letter}" (${letterValues[letter] || 0} поен${letterValues[letter] === 1 ? '' : 'а'}).`);
-        }
 
-        function recallTiles() {
-            if (!isMyTurn || !gameActive || gameIsOver) return;
-            if (newlyPlacedCells.length === 0) {
-                quickMsg('ℹ Нема новопостављених плочица.');
-                return;
+    function shuffleRack() {
+                if (!gameActive || gameIsOver) return;
+                for (let i = myRack.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [myRack[i], myRack[j]] = [myRack[j], myRack[i]];
+                }
+                selectedTileIndex = null;
+                renderMyRack();
+                quickMsg('🔀 Плочице промешане.');
             }
-            for (const p of [...newlyPlacedCells]) myRack.push(p.letter);
-            newlyPlacedCells = [];
-            selectedTileIndex = null;
-            renderBoardFromState(currentBoardState);
-            renderMyRack();
-            quickMsg('↩ Све плочице враћене на таблу.');
-        }
 
-        function shuffleRack() {
-            if (!gameActive || gameIsOver) return;
-            for (let i = myRack.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [myRack[i], myRack[j]] = [myRack[j], myRack[i]];
+            let moveInFlight = false;
+
+    function submitMove() {
+                if (!isMyTurn || !gameActive || gameIsOver || moveInFlight) return;
+                if (newlyPlacedCells.length === 0) {
+                    errorMsg('⚠ Постави бар једно слово на таблу!');
+                    return;
+                }
+                const placements = newlyPlacedCells.map(p => ({ row: p.row, col: p.col, letter: p.letter }));
+                moveInFlight = true;
+                document.getElementById('btnSubmit').disabled = true;
+                sendMessage('place_tiles', { placements });
+                newlyPlacedCells = [];
+                selectedTileIndex = null;
+                quickMsg('⏳ Шаљем потез на проверу...');        
             }
-            selectedTileIndex = null;
-            renderMyRack();
-            quickMsg('🔀 Плочице промешане.');
-        }
 
-        let moveInFlight = false;
-
-        function submitMove() {
-            if (!isMyTurn || !gameActive || gameIsOver || moveInFlight) return;
-            if (newlyPlacedCells.length === 0) {
-                errorMsg('⚠ Постави бар једно слово на таблу!');
-                return;
+    function skipTurn() {
+                if (!isMyTurn || !gameActive || gameIsOver) return;
+                if (newlyPlacedCells.length > 0) {
+                    if (!confirm('Имаш постављене плочице. Сигуран/на да желиш да прескочиш?')) return;
+                    recallTiles();
+                }
+                sendMessage('skip_turn');
+                quickMsg('⏭ Прескачеш потез...');
             }
-            const placements = newlyPlacedCells.map(p => ({ row: p.row, col: p.col, letter: p.letter }));
-            moveInFlight = true;
-            document.getElementById('btnSubmit').disabled = true;
-            sendMessage('place_tiles', { placements });
-            newlyPlacedCells = [];
-            selectedTileIndex = null;
-            quickMsg('⏳ Шаљем потез на проверу...');        
-        }
 
-        function skipTurn() {
-            if (!isMyTurn || !gameActive || gameIsOver) return;
-            if (newlyPlacedCells.length > 0) {
-                if (!confirm('Имаш постављене плочице. Сигуран/на да желиш да прескочиш?')) return;
-                recallTiles();
+    function resignGame() {
+                if (!gameActive) return;
+                if (!confirm('Сигуран/на да желиш да се предаш?')) return;
+                sendMessage('resign');
+                    // showInterstitial() uklonjen — game_over event (showGameOver) će je već pokrenuti
             }
-            sendMessage('skip_turn');
-            quickMsg('⏭ Прескачеш потез...');
-        }
 
-        function resignGame() {
-            if (!gameActive) return;
-            if (!confirm('Сигуран/на да желиш да се предаш?')) return;
-            sendMessage('resign');
-                // showInterstitial() uklonjen — game_over event (showGameOver) će je već pokrenuti
-        }
+    function removeRematchButton() {
+        const btn = document.getElementById('rematchBtn');
+        if (btn) btn.remove();
+    }
 
-        function removeRematchButton() {
-            const btn = document.getElementById('rematchBtn');
-            if (btn) btn.remove();
-        }
+    function goToMainMenu() {
+        sfxMenuClick();
+        sendMessage('leave_game');
+        
+        removeRematchButton();
+        const menuBtn = document.getElementById('menuBtn');
+        if (menuBtn) menuBtn.remove();
+        
+        // Врати акциона дугмад пре одласка у мени
+        showAllActionButtons();
+        
+        gameActive = false;
+        gameIsOver = false;
+        myRack = [];
+        newlyPlacedCells = [];
+        selectedTileIndex = null;
+        document.getElementById('btnQuickMatch').disabled = false;   // ✅ dodato
+        showScreen('optionsScreen');
+    }
+    function hideAllActionButtons() {
+        ['btnSubmit', 'btnRecall', 'btnShuffle', 'btnSkip', 'btnResign'].forEach(id => {
+            const btn = document.getElementById(id);
+            if (btn) btn.style.display = 'none';
+        });
+    }
 
-        function goToMainMenu() {
-            sfxMenuClick();
-            sendMessage('leave_game');
-            
-            removeRematchButton();
-            const menuBtn = document.getElementById('menuBtn');
-            if (menuBtn) menuBtn.remove();
-            
-            // Врати акциона дугмад пре одласка у мени
-            showAllActionButtons();
-            
-            gameActive = false;
-            gameIsOver = false;
-            myRack = [];
-            newlyPlacedCells = [];
-            selectedTileIndex = null;
-            document.getElementById('btnQuickMatch').disabled = false;   // ✅ dodato
-            showScreen('optionsScreen');
-        }
-        function hideAllActionButtons() {
-            ['btnSubmit', 'btnRecall', 'btnShuffle', 'btnSkip', 'btnResign'].forEach(id => {
-                const btn = document.getElementById(id);
-                if (btn) btn.style.display = 'none';
-            });
-        }
+    function showAllActionButtons() {
+        ['btnSubmit', 'btnRecall', 'btnShuffle', 'btnSkip', 'btnResign'].forEach(id => {
+            const btn = document.getElementById(id);
+            if (btn) btn.style.display = '';
+        });
+    }
+    function showGameOver(msg) {
+        gameActive = false;
+        gameIsOver = true;
 
-        function showAllActionButtons() {
-            ['btnSubmit', 'btnRecall', 'btnShuffle', 'btnSkip', 'btnResign'].forEach(id => {
-                const btn = document.getElementById(id);
-                if (btn) btn.style.display = '';
-            });
-        }
-        function showGameOver(msg) {
-            gameActive = false;
-            gameIsOver = true;
+        // Сакриј сва акциона дугмад
+        hideAllActionButtons();
 
-            // Сакриј сва акциона дугмад
-            hideAllActionButtons();
-
-            updateTurnIndicator(false);
-            setMessage('🏁 ' + (msg.resultMessage || 'Игра је завршена.'), 'info', 0);
-            
-            setTimeout(() => {
-                showInterstitial();
-            }, 1500);
-            
-            const controls = document.querySelector('.controls');
-            
-            // Уклони постојеће динамичке дугмиће ако постоје
-            removeRematchButton();
-            const oldMenuBtn = document.getElementById('menuBtn');
-            if (oldMenuBtn) oldMenuBtn.remove();
-            
-            // Додај дугме за реванш
-            const rematchBtn = document.createElement('button');
-            rematchBtn.id = 'rematchBtn';
-            rematchBtn.className = 'btn-primary';
-            rematchBtn.textContent = '🔄 ПОНУДИ РЕВАНШ';
-            rematchBtn.onclick = () => {
-                sendMessage('request_rematch');
-                rematchBtn.disabled = true;
-                rematchBtn.textContent = '⏳ Чекам одговор...';
-                setMessage('⏳ Захтев за реванш послат...', 'info', 0);
-            };
-            controls.appendChild(rematchBtn);
-            
-            // Додај дугме за почетни мени
-            const menuBtn = document.createElement('button');
-            menuBtn.id = 'menuBtn';
-            menuBtn.className = 'btn-light';
-            menuBtn.textContent = '🏠 ПОЧЕТНИ МЕНИ';
-            menuBtn.onclick = () => goToMainMenu();
-            controls.appendChild(menuBtn);
-        }
+        updateTurnIndicator(false);
+        setMessage('🏁 ' + (msg.resultMessage || 'Игра је завршена.'), 'info', 0);
+        
+        setTimeout(() => {
+            showInterstitial();
+        }, 1500);
+        
+        const controls = document.querySelector('.controls');
+        
+        // Уклони постојеће динамичке дугмиће ако постоје
+        removeRematchButton();
+        const oldMenuBtn = document.getElementById('menuBtn');
+        if (oldMenuBtn) oldMenuBtn.remove();
+        
+        // Додај дугме за реванш
+        const rematchBtn = document.createElement('button');
+        rematchBtn.id = 'rematchBtn';
+        rematchBtn.className = 'btn-primary';
+        rematchBtn.textContent = '🔄 ПОНУДИ РЕВАНШ';
+        rematchBtn.onclick = () => {
+            sendMessage('request_rematch');
+            rematchBtn.disabled = true;
+            rematchBtn.textContent = '⏳ Чекам одговор...';
+            setMessage('⏳ Захтев за реванш послат...', 'info', 0);
+        };
+        controls.appendChild(rematchBtn);
+        
+        // Додај дугме за почетни мени
+        const menuBtn = document.createElement('button');
+        menuBtn.id = 'menuBtn';
+        menuBtn.className = 'btn-light';
+        menuBtn.textContent = '🏠 ПОЧЕТНИ МЕНИ';
+        menuBtn.onclick = () => goToMainMenu();
+        controls.appendChild(menuBtn);
+    }
 
         function showRematchRequest(msg) {
     hideRematchRequest();
