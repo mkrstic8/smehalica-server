@@ -685,7 +685,18 @@ socket.on('connected', (data) => {
             } else {
                 setMessage('🎮 Игра почиње! ' + (msg.isYourTurn ? 'Ти си на потезу.' : 'Противник је на потезу.'), 'info', 3000);
             }
-            
+
+            // Ako smo propustili live 'move_result' (npr. veza je pala usred poteza),
+            // javi u čet šta je poslednje odigrano - podatak je uvek u msg.lastMove.
+            if (msg.lastMove && msg.lastMove.words && msg.lastMove.words.length > 0) {
+                const isMyLastMove = msg.lastMove.playerId === playerId;
+                if (isMyLastMove) {
+                    addChatSystemMsg(`🎯 Ти играш: ${msg.lastMove.words.join(', ')} (+${msg.lastMove.score})`);
+                } else {
+                    addChatSystemMsg(`${msg.opponentName || 'Противник'} игра: ${msg.lastMove.words.join(', ')} (+${msg.lastMove.score})`);
+                }
+            }
+
             highlightRack();
         }
         function updateGameState(msg) {
