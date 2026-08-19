@@ -205,6 +205,7 @@
         let gameId = null;
         let myRack = [];
         let isMyTurn = false;
+        let lastServerStateVersion = -1;
         let selectedTileIndex = null;
         let newlyPlacedCells = [];
         let gameActive = false;
@@ -365,7 +366,37 @@
         }
 
         // ==================== SOCKET EVENTI ====================
-        socket.on('connect', () => {
+socket.on('connect', () => {
+
+    console.log('🟢 Socket повезан');
+
+    document.getElementById('connectionStatus').innerHTML =
+        '<span class="connection-dot connected"></span> Повезан';
+
+    if (myName && myName !== 'Играч') {
+        sendMessage('set_name', {
+            name: myName
+        });
+    }
+
+    // Ако је Android направио потпуно нови Socket.IO
+    // након што је апликација враћена из background-а,
+    // socket.io.on('reconnect') не мора бити позван.
+    //
+    // Зато и овде тражимо стање.
+    if (
+        wasInActiveGameBeforeDisconnect &&
+        !gameIsOver
+    ) {
+        console.log(
+            '📡 CONNECT после прекида — тражим актуелно стање.'
+        );
+
+        setTimeout(() => {
+            requestStateFromServer();
+        }, 300);
+    }
+});
             console.log('🟢 Socket povezan');
             document.getElementById('connectionStatus').innerHTML =
                 '<span class="connection-dot connected"></span> Повезан';
@@ -556,17 +587,30 @@ socket.on('connected', (data) => {
         });
 
 socket.io.on('reconnect', () => {
+
     document.getElementById('connectionStatus').innerHTML =
         '<span class="connection-dot connected"></span> Веза обновљена!';
 
     console.log('🔄 Socket.IO reconnect успешан.');
 
-    // Сервер ће нам послати game_state,
-    // али додатно тражимо актуелно стање.
-    if (wasInActiveGameBeforeDisconnect && !gameIsOver) {
+    if (
+        wasInActiveGameBeforeDisconnect &&
+        !gameIsOver
+    ) {
+
+        // Одмах тражимо серверско стање.
+        requestStateFromServer();
+
+        // Додатна провера након кратког времена.
         setTimeout(() => {
-            requestStateFromServer();
-        }, 300);
+            if (
+                socket.connected &&
+                gameActive &&
+                !gameIsOver
+            ) {
+                requestStateFromServer();
+            }
+        }, 1000);
     }
 });
         
@@ -713,40 +757,155 @@ socket.io.on('reconnect', () => {
                 }
             }
         }
-        function updateGameState(msg) {
-            if (msg.board) renderBoardFromState(msg.board);
-            if (msg.yourRack) myRack = [...msg.yourRack];
-            if (msg.yourScore !== undefined) document.getElementById('yourScore').textContent = msg.yourScore;
-            if (msg.opponentScore !== undefined) document.getElementById('opponentScore').textContent = msg.opponentScore;
-            if (msg.bagCount !== undefined) document.getElementById('tilesLeft').textContent = msg.bagCount;
-            if (msg.isYourTurn !== undefined) {
-                isMyTurn = msg.isYourTurn;
-                updateTurnIndicator(msg.isYourTurn);
-                document.getElementById('btnSubmit').disabled = !isMyTurn;
-                document.getElementById('btnSkip').disabled = !isMyTurn;
-                document.getElementById('btnRecall').disabled = !isMyTurn;
-            }
-            if (msg.chatMessages) {
-                chatHistory = msg.chatMessages;
-                renderChatHistory();
-            }
-            if (msg.gameOver) {
-                gameIsOver = true;
-                gameActive = false;
-                document.getElementById('btnSubmit').disabled = true;
-                document.getElementById('btnSkip').disabled = true;
-                document.getElementById('btnRecall').disabled = true;
-            }
-            if (msg.lastMove && msg.lastMove.placements) {
-                lastMoveCells = msg.lastMove.placements.map(p => ({ row: p.row, col: p.col }));
-            } else {
-                lastMoveCells = [];
-            }
-            newlyPlacedCells = [];
-            selectedTileIndex = null;
-            renderMyRack();
+ function updateGameState(msg) {
+
+    // ---------------------------------------------
+    // ЗАШТИТА ОД СТАРОГ СТАЊА
+    // ---------------------------------------------
+
+    if (msg.stateVersion !== undefined) {
+
+        // Ако је нова игра, ресетуј бројач.
+        if (msg.gameId && msg.gameId !== gameId) {
+            lastServerStateVersion = -1;
         }
 
+        const incomingVersion = Number(msg.stateVersion);
+
+        // Не прихватај старије стање.
+        if (
+            Number.isFinite(incomingVersion) &&
+            incomingVersion < lastServerStateVersion
+        ) {
+            console.warn(
+                '⚠️ Игнорисано старо game_state:',
+                incomingVersion,
+                '<',
+                lastServerStateVersion
+            );
+            return;
+        }
+
+        lastServerStateVersion = incomingVersion;
+
+        console.log(
+            `📥 SERVER STATE | game=${msg.gameId} | ` +
+            `version=${incomingVersion} | ` +
+            `isYourTurn=${msg.isYourTurn} | ` +
+            `currentTurn=${msg.currentTurn}`
+        );
+    }
+
+    // ---------------------------------------------
+    // ТАБЛА
+    // ---------------------------------------------
+
+    if (msg.board) {
+        renderBoardFromState(msg.board);
+    }
+
+    // ---------------------------------------------
+    // РУКА
+    // ---------------------------------------------
+
+    if (msg.yourRack) {
+        myRack = [...msg.yourRack];
+    }
+
+    // ---------------------------------------------
+    // ПОЕНИ
+    // ---------------------------------------------
+
+    if (msg.yourScore !== undefined) {
+        document.getElementById('yourScore').textContent =
+            msg.yourScore;
+    }
+
+    if (msg.opponentScore !== undefined) {
+        document.getElementById('opponentScore').textContent =
+            msg.opponentScore;
+    }
+
+    if (msg.bagCount !== undefined) {
+        document.getElementById('tilesLeft').textContent =
+            msg.bagCount;
+    }
+
+    // ---------------------------------------------
+    // ПОТЕЗ
+    // ---------------------------------------------
+
+    if (msg.isYourTurn !== undefined) {
+
+        // ЈЕДИНИ извор истине је сервер.
+        isMyTurn = Boolean(msg.isYourTurn);
+
+        updateTurnIndicator(isMyTurn);
+
+        const btnSubmit =
+            document.getElementById('btnSubmit');
+
+        const btnSkip =
+            document.getElementById('btnSkip');
+
+        const btnRecall =
+            document.getElementById('btnRecall');
+
+        if (btnSubmit) {
+            btnSubmit.disabled = !isMyTurn;
+        }
+
+        if (btnSkip) {
+            btnSkip.disabled = !isMyTurn;
+        }
+
+        if (btnRecall) {
+            btnRecall.disabled = !isMyTurn;
+        }
+    }
+
+    // ---------------------------------------------
+    // CHAT
+    // ---------------------------------------------
+
+    if (msg.chatMessages) {
+        chatHistory = msg.chatMessages;
+        renderChatHistory();
+    }
+
+    // ---------------------------------------------
+    // GAME OVER
+    // ---------------------------------------------
+
+    if (msg.gameOver) {
+        gameIsOver = true;
+        gameActive = false;
+
+        document.getElementById('btnSubmit').disabled = true;
+        document.getElementById('btnSkip').disabled = true;
+        document.getElementById('btnRecall').disabled = true;
+    }
+
+    // ---------------------------------------------
+    // ПОСЛЕДЊИ ПОТЕЗ
+    // ---------------------------------------------
+
+    if (msg.lastMove && msg.lastMove.placements) {
+        lastMoveCells = msg.lastMove.placements.map(
+            p => ({
+                row: p.row,
+                col: p.col
+            })
+        );
+    } else {
+        lastMoveCells = [];
+    }
+
+    newlyPlacedCells = [];
+    selectedTileIndex = null;
+
+    renderMyRack();
+}
         function renderBoardFromState(boardState) {
             currentBoardState = boardState;
             const boardEl = document.getElementById('board');
@@ -1047,6 +1206,8 @@ socket.io.on('reconnect', () => {
                 const placements = newlyPlacedCells.map(p => ({ row: p.row, col: p.col, letter: p.letter }));
                 moveInFlight = true;
                 document.getElementById('btnSubmit').disabled = true;
+                isMyTurn = false;
+                updateTurnIndicator(false);
                 sendMessage('place_tiles', { placements });
                 newlyPlacedCells = [];
                 selectedTileIndex = null;

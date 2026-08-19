@@ -188,6 +188,7 @@ function createGame(player1Id, player2Id) {
         status: 'active',
         winner: null,
         lastMove: null,
+        stateVersion: 0,
         skipCount: 0,
         createdAt: Date.now(),
         chatMessages: []          // <-- DODAJ OVO
@@ -229,6 +230,7 @@ function getGameState(game, playerId) {
         currentTurn: game.currentTurn,
         isYourTurn: game.currentTurn === playerId,
         isFirstMove: game.isFirstMove,
+        stateVersion: game.stateVersion || 0,
         status: game.status,
         winner: game.winner,
         bagCount: game.bag.length,
@@ -792,46 +794,91 @@ io.on('connection', (socket) => {
     console.log(`🔌 Novi socket: ${socket.id} (playerId: ${playerId.substring(0,8)})`);
 
     // Ako igrač već postoji u players, ažuriraj socket i otkaži disconnect tajmer
-    if (players[playerId]) {
-        const existingPlayer = players[playerId];
-        existingPlayer.socket = socket;
-        if (existingPlayer.disconnectTimer) {
-            clearTimeout(existingPlayer.disconnectTimer);
-            existingPlayer.disconnectTimer = null;
-        }
-                // ✅ Ponovo pridruži socket Socket.IO sobi igre (bitno za chat i broadcast poruke!)
-        if (existingPlayer.gameId) {
-            socket.join(existingPlayer.gameId);
-            socket.data.gameId = existingPlayer.gameId;
+if (players[playerId]) {
+    const existingPlayer = players[playerId];
 
-            const activeGame = games[existingPlayer.gameId];
-            if (activeGame && activeGame.status === 'active') {
-                const opponentId = Object.keys(activeGame.players).find(id => id !== playerId);
-                if (opponentId) {
-                    sendToPlayer(opponentId, 'opponent_reconnected', {
-                        message: `${existingPlayer.name} се вратио у игру.`
-                    });
+    // ------------------------------------------------
+    // НОВИ SOCKET ПОСТАЈЕ ЈЕДИНИ ВАЖЕЋИ SOCKET
+    // ------------------------------------------------
+
+    const oldSocket = existingPlayer.socket;
+
+    existingPlayer.socket = socket;
+
+    // Откажи аутоматску предају.
+    if (existingPlayer.disconnectTimer) {
+        clearTimeout(existingPlayer.disconnectTimer);
+        existingPlayer.disconnectTimer = null;
+    }
+
+    // ------------------------------------------------
+    // ВРАТИ ИГРАЧА У SOCKET.IO ROOM
+    // ------------------------------------------------
+
+    if (existingPlayer.gameId) {
+        socket.join(existingPlayer.gameId);
+        socket.data.gameId = existingPlayer.gameId;
+
+        const activeGame = games[existingPlayer.gameId];
+
+        if (activeGame) {
+
+            // Обавезно провери да ли је играч стварно део игре.
+            if (!activeGame.players[playerId]) {
+                console.warn(
+                    `⚠️ Играч ${playerId.substring(0, 8)} није део игре ${activeGame.id}`
+                );
+            } else {
+
+                console.log(
+                    `🔄 RECONNECT ${existingPlayer.name} | ` +
+                    `game=${activeGame.id} | ` +
+                    `turn=${activeGame.currentTurn?.substring(0, 8)} | ` +
+                    `myTurn=${activeGame.currentTurn === playerId} | ` +
+                    `version=${activeGame.stateVersion || 0}`
+                );
+
+                // Обавести противника да се играч вратио.
+                const opponentId = Object.keys(activeGame.players)
+                    .find(id => id !== playerId);
+
+                if (
+                    activeGame.status === 'active' &&
+                    opponentId
+                ) {
+                    sendToPlayer(
+                        opponentId,
+                        'opponent_reconnected',
+                        {
+                            message: `${existingPlayer.name} се вратио у игру.`
+                        }
+                    );
                 }
             }
         }
-
-        console.log(`🔁 Igrač se ponovo povezao: ${playerId.substring(0,8)}`);
-    } else {
-            players[playerId] = {
-                socket: socket,
-                sessionToken: generateSessionToken(),
-                gameId: null,
-                playerNum: null,
-                name: 'Играч',
-                disconnectTimer: null,
-                lastCancelTime: 0,
-                roomLink: null,
-                lastChatTime: 0,
-                lastTypingTime: 0,
-                lastRematchTime: 0,
-                rematchRequestedBy: null
-            };
     }
+
+    console.log(
+        `🔁 Играч се поново повезао: ${playerId.substring(0, 8)}`
+    );
+
+} else {
+
+    players[playerId] = {
+        socket: socket,
+        sessionToken: generateSessionToken(),
+        gameId: null,
+        playerNum: null,
+        name: 'Играч',
+        disconnectTimer: null,
+        lastCancelTime: 0,
+        roomLink: null,
+        lastChatTime: 0,
+        lastTypingTime: 0,
+        lastRematchTime: 0,
+        rematchRequestedBy: null
+    };
+}
 
     // Pošalji potvrdu sa playerId
     socket.emit('connected', {
@@ -1265,52 +1312,58 @@ for (const pid of Object.keys(game.players)) {
         p.socket.emit('chat_message', moveChatMessage);
     }
 }
-    game.skipCount = 0;
+game.skipCount = 0;
 
-    const opponentId = Object.keys(game.players).find(id => id !== playerId);
-    game.currentTurn = opponentId;
+const opponentId = Object.keys(game.players)
+    .find(id => id !== playerId);
 
-    let gameOver = false;
-    let winner = null;
-    if (game.bag.length === 0) {
-        const p1Rack = game.players[playerId].rack;
-        const p2Rack = game.players[opponentId].rack;
-        if (p1Rack.length === 0 || p2Rack.length === 0) {
-            gameOver = true;
-            let p1Deduction = 0, p2Deduction = 0;
-            for (const l of p1Rack) p1Deduction += letterValues[l] || 0;
-            for (const l of p2Rack) p2Deduction += letterValues[l] || 0;
-            game.players[playerId].score -= p1Deduction;
-            game.players[opponentId].score -= p2Deduction;
-            const p1Score = game.players[playerId].score;
-            const p2Score = game.players[opponentId].score;
-            if (p1Score > p2Score) winner = playerId;
-            else if (p2Score > p1Score) winner = opponentId;
-            else winner = 'draw';
-            game.status = 'finished';
-            game.winner = winner;
-        }
+// Промена потеза мора бити урађена НА СЕРВЕРУ.
+game.currentTurn = opponentId;
+
+// Ново стање игре.
+game.stateVersion = (game.stateVersion || 0) + 1;
+
+let gameOver = false;
+let winner = null;
+if (game.bag.length === 0) {
+    const p1Rack = game.players[playerId].rack;
+    const p2Rack = game.players[opponentId].rack;
+    if (p1Rack.length === 0 || p2Rack.length === 0) {
+        gameOver = true;
+        let p1Deduction = 0, p2Deduction = 0;
+        for (const l of p1Rack) p1Deduction += letterValues[l] || 0;
+        for (const l of p2Rack) p2Deduction += letterValues[l] || 0;
+        game.players[playerId].score -= p1Deduction;
+        game.players[opponentId].score -= p2Deduction;
+        const p1Score = game.players[playerId].score;
+        const p2Score = game.players[opponentId].score;
+        if (p1Score > p2Score) winner = playerId;
+        else if (p2Score > p1Score) winner = opponentId;
+        else winner = 'draw';
+        game.status = 'finished';
+        game.winner = winner;
     }
+}
 
-    for (const pid of Object.keys(game.players)) {
-        const state = getGameState(game, pid);
-        state.type = 'move_result';
-        state.lastMovePlayerName = players[playerId].name;
-        state.lastMoveWords = result.words;
-        state.lastMoveScore = result.score;
-        if (gameOver) {
-            state.type = 'game_over';
-            state.gameOver = true;
-            if (winner === 'draw') state.resultMessage = '🤝 Нерешено!';
-            else if (winner === pid) state.resultMessage = '🎉 Победио/ла си!';
-            else state.resultMessage = '😞 Изгубио/ла си.';
-            state.finalScores = {
-                you: game.players[pid].score,
-                opponent: game.players[opponentId].score
-            };
-        }
-        sendToPlayer(pid, state.type, state);
+for (const pid of Object.keys(game.players)) {
+    const state = getGameState(game, pid);
+    state.type = 'move_result';
+    state.lastMovePlayerName = players[playerId].name;
+    state.lastMoveWords = result.words;
+    state.lastMoveScore = result.score;
+    if (gameOver) {
+        state.type = 'game_over';
+        state.gameOver = true;
+        if (winner === 'draw') state.resultMessage = '🤝 Нерешено!';
+        else if (winner === pid) state.resultMessage = '🎉 Победио/ла си!';
+        else state.resultMessage = '😞 Изгубио/ла си.';
+        state.finalScores = {
+            you: game.players[pid].score,
+            opponent: game.players[opponentId].score
+        };
     }
+    sendToPlayer(pid, state.type, state);
+}
 
     console.log(`🎯 Igra ${game.id}: ${players[playerId].name} igra ${result.words.join(', ')} (+${result.score})`);
 }
@@ -1321,9 +1374,20 @@ function handleSkipTurn(socket, playerId) {
     const game = games[player.gameId];
     if (!game || game.currentTurn !== playerId) return;
 
-    const opponentId = Object.keys(game.players).find(id => id !== playerId);
+    const opponentId = Object.keys(game.players)
+    .find(id => id !== playerId);
+
     game.currentTurn = opponentId;
-    game.lastMove = { playerId: playerId, words: [], score: 0, skipped: true };
+
+    game.lastMove = {
+        playerId: playerId,
+        words: [],
+        score: 0,
+        skipped: true
+    };
+
+    // Ново серверско стање.
+    game.stateVersion = (game.stateVersion || 0) + 1;
     if (!game.skipCount) game.skipCount = 0;
     game.skipCount++;
 
