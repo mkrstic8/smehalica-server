@@ -700,7 +700,7 @@ socket.io.on('reconnect', () => {
                 setMessage('🔄 Веза обновљена, игра настављена.', 'info', 3000);
             } else {
                 setMessage('🎮 Игра почиње! ' + (msg.isYourTurn ? 'Ти си на потезу.' : 'Противник је на потезу.'), 'info', 3000);
-
+            }
             // Ako smo propustili live 'move_result' (npr. veza je pala usred poteza),
             // javi u čet šta je poslednje odigrano - podatak je uvek u msg.lastMove.
 
