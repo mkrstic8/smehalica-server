@@ -1589,7 +1589,7 @@ setInterval(() => {
 // ==================== GLOBALNA ZAŠTITA OD PADA SERVERA ====================
 process.on('uncaughtException', (err) => {
     console.error('❌ NEUHVAĆENA GREŠKA:', err);
-    // Server nastavlja da radi umesto da se ugasi
+    // Server nastavlja da radi umesto da se ugas
 });
 
 process.on('unhandledRejection', (reason) => {
