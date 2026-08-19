@@ -628,6 +628,78 @@ const httpServer = http.createServer((req, res) => {
     }
 });
 
+// ==================== ZAŠTITA OD MASOVNIH KONEKCIJA (DoS) ====================
+// Podesivi limiti - po potrebi promeni na osnovu stvarnog saobraćaja.
+const MAX_CONCURRENT_PER_IP = 20;     // koliko ISTOVREMENIH konekcija sme jedna IP adresa da drži
+const MAX_NEW_CONN_PER_WINDOW = 30;   // koliko NOVIH konekcija jedna IP sme da otvori u prozoru ispod
+const CONN_WINDOW_MS = 60 * 1000;     // dužina tog prozora (60s)
+const MAX_TOTAL_CONCURRENT = 500;     // globalni maksimum konekcija na server, bez obzira na IP
+
+const connectionsByIp = new Map();     // ip -> Set<socket.id>  (trenutni broj otvorenih konekcija)
+const connectAttemptsByIp = new Map(); // ip -> [timestamps]    (brzina otvaranja novih konekcija)
+
+function getClientIp(socket) {
+    const xff = socket.handshake.headers['x-forwarded-for'];
+    if (typeof xff === 'string' && xff.length > 0) {
+        const parts = xff.split(',').map(p => p.trim()).filter(Boolean);
+        if (parts.length > 0) {
+            // Render i slični PaaS dodaju STVARNU IP adresu na KRAJ liste kad je proslede dalje;
+            // sve pre poslednje stavke klijent može sam da izmisli, zato uzimamo poslednju.
+            return parts[parts.length - 1];
+        }
+    }
+    return socket.handshake.address || 'unknown';
+}
+
+function registerConnectionForIp(ip, socketId) {
+    let set = connectionsByIp.get(ip);
+    if (!set) {
+        set = new Set();
+        connectionsByIp.set(ip, set);
+    }
+    set.add(socketId);
+}
+
+function unregisterConnectionForIp(ip, socketId) {
+    const set = connectionsByIp.get(ip);
+    if (!set) return;
+    set.delete(socketId);
+    if (set.size === 0) {
+        connectionsByIp.delete(ip);
+    }
+}
+
+// true ako je IP adresa premašila dozvoljeni broj NOVIH konekcija u prozoru vremena
+function isRateLimited(ip) {
+    const now = Date.now();
+    let attempts = connectAttemptsByIp.get(ip);
+    if (!attempts) {
+        attempts = [];
+        connectAttemptsByIp.set(ip, attempts);
+    }
+    while (attempts.length > 0 && now - attempts[0] > CONN_WINDOW_MS) {
+        attempts.shift();
+    }
+    if (attempts.length >= MAX_NEW_CONN_PER_WINDOW) {
+        return true;
+    }
+    attempts.push(now);
+    return false;
+}
+
+// Povremeno počisti stare/prazne zapise da connectAttemptsByIp ne raste unedogled
+setInterval(() => {
+    const now = Date.now();
+    for (const [ip, attempts] of connectAttemptsByIp.entries()) {
+        while (attempts.length > 0 && now - attempts[0] > CONN_WINDOW_MS) {
+            attempts.shift();
+        }
+        if (attempts.length === 0) {
+            connectAttemptsByIp.delete(ip);
+        }
+    }
+}, 5 * 60 * 1000);
+
 const io = new Server(httpServer, {
     cors: {
         origin: "*",
@@ -635,6 +707,29 @@ const io = new Server(httpServer, {
     },
     pingTimeout: 60000,
     pingInterval: 25000
+});
+
+// ==================== MIDDLEWARE ZA OGRANIČENJE KONEKCIJA ====================
+// Ide PRE auth middleware-a namerno: jeftina provera prva, da se zloupotreba
+// odbije pre skupljeg pretraživanja svih igrača radi sessionToken-a ispod.
+io.use((socket, next) => {
+    const ip = getClientIp(socket);
+    socket.data.clientIp = ip;
+
+    if (io.engine.clientsCount >= MAX_TOTAL_CONCURRENT) {
+        return next(new Error('Server je trenutno pun. Pokušaj ponovo za koji minut.'));
+    }
+
+    const currentForIp = connectionsByIp.get(ip);
+    if (currentForIp && currentForIp.size >= MAX_CONCURRENT_PER_IP) {
+        return next(new Error('Previše aktivnih konekcija sa ove adrese.'));
+    }
+
+    if (isRateLimited(ip)) {
+        return next(new Error('Previše pokušaja povezivanja. Sačekaj malo pa probaj ponovo.'));
+    }
+
+    next();
 });
 
 // ==================== MIDDLEWARE ZA IGRAČE ====================
@@ -682,6 +777,7 @@ io.use((socket, next) => {
 // ==================== KONEKCIJA ====================
 io.on('connection', (socket) => {
     const playerId = socket.data.playerId;
+    registerConnectionForIp(socket.data.clientIp, socket.id);
     console.log(`🔌 Novi socket: ${socket.id} (playerId: ${playerId.substring(0,8)})`);
 
     // Ako igrač već postoji u players, ažuriraj socket i otkaži disconnect tajmer
@@ -863,6 +959,7 @@ socket.on('typing', () => {
     });
 
     socket.on('disconnect', () => {
+        unregisterConnectionForIp(socket.data.clientIp, socket.id);
         handleDisconnect(socket, playerId);
     });
 
@@ -1589,7 +1686,7 @@ setInterval(() => {
 // ==================== GLOBALNA ZAŠTITA OD PADA SERVERA ====================
 process.on('uncaughtException', (err) => {
     console.error('❌ NEUHVAĆENA GREŠKA:', err);
-    // Server nastavlja da radi umesto da se ugas
+    // Server nastavlja da radi umesto da se ugasi
 });
 
 process.on('unhandledRejection', (reason) => {
