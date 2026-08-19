@@ -376,12 +376,20 @@
             }
         });
 
-        socket.on('disconnect', (reason) => {
-            console.log('🔴 Socket diskonektovan:', reason);
-            document.getElementById('connectionStatus').innerHTML =
-                '<span class="connection-dot disconnected"></span> Веза прекинута...';
-            gameActive = false;
-        });
+let wasInActiveGameBeforeDisconnect = false;
+
+socket.on('disconnect', (reason) => {
+    console.log('🔴 Socket diskonektovan:', reason);
+
+    // Запамти да смо били у активној игри.
+    // НЕ постављај gameActive = false!
+    if (gameActive && !gameIsOver) {
+        wasInActiveGameBeforeDisconnect = true;
+    }
+
+    document.getElementById('connectionStatus').innerHTML =
+        '<span class="connection-dot disconnected"></span> Веза прекинута...';
+});
 
 socket.on('connected', (data) => {
     playerId = data.playerId;
@@ -432,10 +440,8 @@ socket.on('connected', (data) => {
                             }
                         });
                     }
-                    addChatSystemMsg(`🎯 Ти играш: ${msg.lastMoveWords.join(', ')} (+${msg.lastMoveScore})`);
                 } else {
                     sfxOpponent();
-                    addChatSystemMsg(`${msg.lastMovePlayerName} игра: ${msg.lastMoveWords.join(', ')} (+${msg.lastMoveScore})`);
                 }
             }
         });
@@ -549,10 +555,20 @@ socket.on('connected', (data) => {
                 `<span class="connection-dot disconnected"></span> Покушавам поновну везу (${attempt})...`;
         });
 
-        socket.io.on('reconnect', () => {
-            document.getElementById('connectionStatus').innerHTML =
-                '<span class="connection-dot connected"></span> Веза обновљена!';
-        });
+socket.io.on('reconnect', () => {
+    document.getElementById('connectionStatus').innerHTML =
+        '<span class="connection-dot connected"></span> Веза обновљена!';
+
+    console.log('🔄 Socket.IO reconnect успешан.');
+
+    // Сервер ће нам послати game_state,
+    // али додатно тражимо актуелно стање.
+    if (wasInActiveGameBeforeDisconnect && !gameIsOver) {
+        setTimeout(() => {
+            requestStateFromServer();
+        }, 300);
+    }
+});
         
         socket.on('opponent_disconnected', (msg) => {
             permanentMsg('⚠ ' + msg.message);
@@ -684,18 +700,19 @@ socket.on('connected', (data) => {
                 setMessage('🔄 Веза обновљена, игра настављена.', 'info', 3000);
             } else {
                 setMessage('🎮 Игра почиње! ' + (msg.isYourTurn ? 'Ти си на потезу.' : 'Противник је на потезу.'), 'info', 3000);
-            }
 
             // Ako smo propustili live 'move_result' (npr. veza je pala usred poteza),
             // javi u čet šta je poslednje odigrano - podatak je uvek u msg.lastMove.
-            if (msg.lastMove && msg.lastMove.words && msg.lastMove.words.length > 0) {
-                const isMyLastMove = msg.lastMove.playerId === playerId;
-                if (isMyLastMove) {
-                    addChatSystemMsg(`🎯 Ти играш: ${msg.lastMove.words.join(', ')} (+${msg.lastMove.score})`);
-                } else {
-                    addChatSystemMsg(`${msg.opponentName || 'Противник'} игра: ${msg.lastMove.words.join(', ')} (+${msg.lastMove.score})`);
-                }
-            }
+
+if (msg.lastMove && msg.lastMove.words && msg.lastMove.words.length > 0) {
+    const isMyLastMove = msg.lastMove.playerId === playerId;
+    if (isMyLastMove) {
+        addChatSystemMsg(`🎯 Ти играш: ${msg.lastMove.words.join(', ')} (+${msg.lastMove.score})`);
+    } else {
+        addChatSystemMsg(`${msg.opponentName || 'Противник'} игра: ${msg.lastMove.words.join(', ')} (+${msg.lastMove.score})`);
+    }
+}
+
 
             highlightRack();
         }
@@ -1269,15 +1286,39 @@ socket.on('connected', (data) => {
             if (window.Capacitor && Capacitor.Plugins.App) {
                 const { App } = Capacitor.Plugins;
                 App.addListener('appStateChange', ({ isActive }) => {
+
                     if (!isActive) {
-                        console.log('📱 Aplikacija u pozadini, držim socket...');
-                    } else {
-                        if (!socket.connected) {
-                            socket.connect();
-                        }
-                        if (gameActive) {
-                            requestStateFromServer();
-                        }
+                        console.log(
+                            '📱 Aplikacija u pozadini. ' +
+                            'Ne napuštam igru i ne šaljem resign.'
+                        );
+
+                        return;
+                    }
+
+                    console.log('📱 Aplikacija ponovo aktivna.');
+
+                    // Ako je socket prekinut, pokreni reconnect.
+                    if (!socket.connected) {
+                        console.log('🔄 Pokrećem Socket.IO reconnect...');
+                        socket.connect();
+                    }
+
+                    // Ako smo bili u aktivnoj igri,
+                    // odmah tražimo kompletno stanje sa servera.
+                    if (wasInActiveGameBeforeDisconnect && !gameIsOver) {
+
+                        setTimeout(() => {
+
+                            if (socket.connected) {
+                                console.log(
+                                    '🔄 Tražim stanje igre nakon povratka u aplikaciju...'
+                                );
+
+                                requestStateFromServer();
+                            }
+
+                        }, 500);
                     }
                 });
             }

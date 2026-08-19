@@ -9,7 +9,7 @@ const { Server } = require('socket.io');
 // ==================== KONFIGURACIJA ====================
 const PORT = process.env.PORT || 3000;
 const BOARD_SIZE = 15;
-const DISCONNECT_GRACE_MS = 60 * 1000; // 1 minut pre predaje
+const DISCONNECT_GRACE_MS =5 * 60 * 1000; // 1 minut pre predaje
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 const COOLDOWN_MS = 10 * 1000;
 // Bonus tabla
@@ -1241,6 +1241,30 @@ function handlePlaceTiles(socket, playerId, placements) {
         score: result.score,
         placements: result.placements
     };
+    // Сачувај одиграни потез у историју чета.
+// Ово омогућава да се потез види и после reconnect-а.
+const moveChatMessage = {
+    type: 'move',
+    from: players[playerId].name,
+    text: `🎯 игра: ${result.words.join(', ')} (+${result.score})`,
+    timestamp: Date.now()
+};
+
+game.chatMessages.push(moveChatMessage);
+
+// Максимално 100 chat/system порука.
+if (game.chatMessages.length > 100) {
+    game.chatMessages.shift();
+}
+
+// Пошаљи потез као праву chat поруку свим играчима.
+for (const pid of Object.keys(game.players)) {
+    const p = players[pid];
+
+    if (p && p.socket) {
+        p.socket.emit('chat_message', moveChatMessage);
+    }
+}
     game.skipCount = 0;
 
     const opponentId = Object.keys(game.players).find(id => id !== playerId);
@@ -1628,45 +1652,111 @@ function getCooldownRemaining(player) {
 // ==================== DISCONNECT SA GRACE PERIODOM ====================
 function handleDisconnect(socket, playerId) {
     const player = players[playerId];
+
     if (!player) return;
 
-    // Ako je disconnecting socket različit od trenutnog, ignoriši
+    // Ако је овај socket већ стар и играч има нову активну
+    // konekciju, ovaj disconnect ne sme da utiče na igrača.
     if (player.socket && player.socket.id !== socket.id) {
-        console.log(`🔌 Stari socket ${socket.id} diskonektovan, ignorišem (trenutni je ${player.socket.id})`);
+        console.log(
+            `🔌 Stari socket ${socket.id} diskonektovan, ignorišem.`
+        );
         return;
     }
 
-    console.log(`🔌 Socket disconnected: ${socket.id} (playerId: ${playerId.substring(0,8)})`);
+    console.log(
+        `🔌 Socket disconnected: ${socket.id} ` +
+        `(playerId: ${playerId.substring(0, 8)})`
+    );
 
-    // Ukloni iz matchmaking-a odmah
+    // Odmah označi igrača kao offline.
+    player.socket = null;
+
+    // Ukloni iz matchmaking reda.
     if (matchmaking.has(playerId)) {
         matchmaking.delete(playerId);
-        console.log(`🔴 Igrač ${playerId.substring(0,8)} uklonjen iz reda zbog diskonekcije.`);
+
+        console.log(
+            `🔴 Igrač ${playerId.substring(0, 8)} ` +
+            `uklonjen iz reda zbog diskonekcije.`
+        );
     }
 
-    // Ako je u aktivnoj igri, pokreni tajmer
-    if (player.gameId) {
-        const game = games[player.gameId];
-        if (game && game.status === 'active') {
-            const opponentId = Object.keys(game.players).find(id => id !== playerId);
-            if (opponentId) {
-                sendToPlayer(opponentId, 'opponent_disconnected', {
-                    message: `${player.name} је изгубио везу. Чекам повратак...`,
-                    graceSeconds: DISCONNECT_GRACE_MS / 1000
-                });
-            }
-            console.log(`⏳ Igrač ${playerId.substring(0,8)} diskonektovan iz aktivne igre. Čekam ${DISCONNECT_GRACE_MS/1000}s pre predaje...`);
-            player.disconnectTimer = setTimeout(() => {
-                console.log(`⏰ Vreme isteklo, automatska predaja igrača ${playerId.substring(0,8)}`);
-                if (players[playerId] && players[playerId].gameId === player.gameId) {
-                    handleResign(null, playerId);
-                }
-            }, DISCONNECT_GRACE_MS);
+    if (!player.gameId) {
+        return;
+    }
+
+    const gameIdAtDisconnect = player.gameId;
+    const game = games[gameIdAtDisconnect];
+
+    if (!game || game.status !== 'active') {
+        return;
+    }
+
+    const opponentId = Object.keys(game.players)
+        .find(id => id !== playerId);
+
+    if (opponentId) {
+        sendToPlayer(opponentId, 'opponent_disconnected', {
+            message: `${player.name} је изгубио везу. Чекам повратак...`,
+            graceSeconds: DISCONNECT_GRACE_MS / 1000
+        });
+    }
+
+    console.log(
+        `⏳ Igrač ${playerId.substring(0, 8)} je offline. ` +
+        `Čekam ${DISCONNECT_GRACE_MS / 1000}s pre automatske predaje...`
+    );
+
+    // Ako postoji neki stari timer, ukloni ga.
+    if (player.disconnectTimer) {
+        clearTimeout(player.disconnectTimer);
+        player.disconnectTimer = null;
+    }
+
+    player.disconnectTimer = setTimeout(() => {
+        const currentPlayer = players[playerId];
+
+        if (!currentPlayer) {
+            return;
         }
-    }
 
-    // Postavi socket na null da znamo da je offline (ali zadržavamo player objekat)
-    player.socket = null;
+        // KLJUČNA PROVERA:
+        // Ako se igrač u međuvremenu reconnectovao,
+        // socket više nije null i NE SME da bude predat.
+        if (currentPlayer.socket !== null) {
+            console.log(
+                `✅ Igrač ${playerId.substring(0, 8)} se vratio. ` +
+                `Automatska predaja otkazana.`
+            );
+
+            currentPlayer.disconnectTimer = null;
+            return;
+        }
+
+        // Mora i dalje biti u istoj igri.
+        if (currentPlayer.gameId !== gameIdAtDisconnect) {
+            currentPlayer.disconnectTimer = null;
+            return;
+        }
+
+        const currentGame = games[gameIdAtDisconnect];
+
+        if (!currentGame || currentGame.status !== 'active') {
+            currentPlayer.disconnectTimer = null;
+            return;
+        }
+
+        console.log(
+            `⏰ Grace period istekao. ` +
+            `Automatska predaja igrača ${playerId.substring(0, 8)}.`
+        );
+
+        currentPlayer.disconnectTimer = null;
+
+        handleResign(null, playerId);
+
+    }, DISCONNECT_GRACE_MS);
 }
 
 // ==================== ČIŠĆENJE ====================
