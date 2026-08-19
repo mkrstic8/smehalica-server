@@ -883,6 +883,83 @@ if (msg.lastMove && msg.lastMove.words && msg.lastMove.words.length > 0) {
         function permanentMsg(msg, type = 'info') { setMessage(msg, type, 0); }
 
         // ==================== INTERAKCIJE ====================
+
+function animateCell(row, col, animation = 'bounce') {
+    const cell = document.querySelector(
+        `.cell[data-row="${row}"][data-col="${col}"]`
+    );
+
+    if (!cell) return;
+
+    // Ukloni prethodnu animaciju ako postoji
+    cell.classList.remove('cell-bounce', 'cell-shake');
+
+    // Omogući ponovno pokretanje iste animacije
+    void cell.offsetWidth;
+
+    if (animation === 'shake') {
+        cell.classList.add('cell-shake');
+
+        setTimeout(() => {
+            cell.classList.remove('cell-shake');
+        }, 400);
+
+    } else {
+        cell.classList.add('cell-bounce');
+
+        setTimeout(() => {
+            cell.classList.remove('cell-bounce');
+        }, 300);
+    }
+}
+// ==================== KONFETE ====================
+
+function spawnConfetti() {
+    const container = document.createElement('div');
+
+    container.className = 'confetti-container';
+
+    Object.assign(container.style, {
+        position: 'fixed',
+        inset: '0',
+        pointerEvents: 'none',
+        overflow: 'hidden',
+        zIndex: '99999'
+    });
+
+    document.body.appendChild(container);
+
+    const pieces = 80;
+
+    for (let i = 0; i < pieces; i++) {
+        const piece = document.createElement('div');
+
+        piece.className = 'confetti-piece';
+
+        const size = 6 + Math.random() * 7;
+        const left = Math.random() * 100;
+        const duration = 1.5 + Math.random() * 2;
+        const delay = Math.random() * 0.5;
+        const rotation = Math.random() * 360;
+
+        Object.assign(piece.style, {
+            position: 'absolute',
+            left: `${left}%`,
+            top: '-20px',
+            width: `${size}px`,
+            height: `${size * 1.5}px`,
+            background: `hsl(${Math.random() * 360}, 80%, 60%)`,
+            transform: `rotate(${rotation}deg)`,
+            animation: `confettiFall ${duration}s ease-out ${delay}s forwards`
+        });
+
+        container.appendChild(piece);
+    }
+
+    setTimeout(() => {
+        container.remove();
+    }, 4500);
+}
         function onRackClick(index) {
             if (!isMyTurn || !gameActive || gameIsOver) return;
             selectedTileIndex = (selectedTileIndex === index) ? null : index;

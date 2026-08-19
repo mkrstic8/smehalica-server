@@ -551,7 +551,51 @@ button:disabled {
     line-height: 1.5;
     margin: 0;
 }
+/* ==================== ANIMACIJE POLJA ==================== */
 
+.cell-bounce {
+    animation: cellBounce 0.3s ease;
+}
+
+@keyframes cellBounce {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.18);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+.cell-shake {
+    animation: cellShake 0.4s ease;
+}
+
+@keyframes cellShake {
+    0%, 100% {
+        transform: translateX(0);
+    }
+
+    20% {
+        transform: translateX(-5px);
+    }
+
+    40% {
+        transform: translateX(5px);
+    }
+
+    60% {
+        transform: translateX(-5px);
+    }
+
+    80% {
+        transform: translateX(5px);
+    }
+}
 @media (max-width: 600px) {
   h1 { font-size: 1.2rem; }
   button { padding: 6px 10px; font-size: 0.7rem; }
