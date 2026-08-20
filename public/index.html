@@ -419,7 +419,7 @@ socket.on('disconnect', (reason) => {
 socket.on('connected', (data) => {
     playerId = data.playerId;
     sessionToken = data.sessionToken;
-
+    socket.auth.sessionToken = sessionToken;   // ← ДОДАТИ
     localStorage.setItem(
         'smehalica_playerId',
         playerId
@@ -438,6 +438,10 @@ socket.on('connected', (data) => {
             errorMsg(data.message);
             if (data.cooldownSeconds) {
                 startCooldown(data.cooldownSeconds);
+            }
+            if (moveInFlight) {                // ← ДОДАТИ
+                 moveInFlight = false;
+                requestStateFromServer();
             }
         });
 
