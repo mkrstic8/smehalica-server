@@ -330,6 +330,20 @@ function getGameState(game, playerId) {
 
 // ==================== VALIDACIJA POTEZA ====================
 function validateMove(game, playerId, placements) {
+    const seen = new Set();
+
+for (const p of placements) {
+    const key = `${p.row},${p.col}`;
+
+    if (seen.has(key)) {
+        return {
+            valid: false,
+            error: 'Дуплирана позиција плочице.'
+        };
+    }
+
+    seen.add(key);
+}
     if (game.currentTurn !== playerId) {
         return { valid: false, error: 'Није твој потез.' };
     }
@@ -1547,9 +1561,12 @@ for (const pid of Object.keys(game.players)) {
         if (winner === 'draw') state.resultMessage = '🤝 Нерешено!';
         else if (winner === pid) state.resultMessage = '🎉 Победио/ла си!';
         else state.resultMessage = '😞 Изгубио/ла си.';
+        const opponentIdForState =
+            pid === playerId ? opponentId : playerId;
+
         state.finalScores = {
             you: game.players[pid].score,
-            opponent: game.players[opponentId].score
+            opponent: game.players[opponentIdForState].score
         };
     }
     sendToPlayer(pid, state.type, state);
@@ -1612,10 +1629,13 @@ function handleSkipTurn(socket, playerId) {
                 : winner === pid
                     ? 'Нема више добрих потеза, рачунам скор. Победио/ла си!🎉 '
                     : ' Нема више добрих потеза, рачунам скор. Изгубио/ла си. 😞';
-            state.finalScores = {
-                you: game.players[pid].score,
-                opponent: game.players[opponentId].score
-            };
+const opponentIdForState =
+    pid === playerId ? opponentId : playerId;
+
+state.finalScores = {
+    you: game.players[pid].score,
+    opponent: game.players[opponentIdForState].score
+};
         }
         sendToPlayer(pid, state.type, state);
     }
