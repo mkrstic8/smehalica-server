@@ -1076,7 +1076,7 @@ socket.on('set_name', (data) => {
     });
 
     socket.on('join_room', (data) => {
-        handleJoinRoom(socket, playerId, data.roomLink);
+        handleJoinRoom(socket, playerId, data?.roomLink);
     });
 
     socket.on('quick_match', () => {
@@ -1088,7 +1088,7 @@ socket.on('set_name', (data) => {
     });
 
     socket.on('place_tiles', (data) => {
-        handlePlaceTiles(socket, playerId, data.placements);
+        handlePlaceTiles(socket, playerId, data?.placements);
     });
 
     socket.on('skip_turn', () => {
@@ -1104,7 +1104,7 @@ socket.on('set_name', (data) => {
     });
 
     socket.on('chat', (data) => {
-        handleChat(socket, playerId, data.text);
+        handleChat(socket, playerId, data?.text);
     });
 
 socket.on('typing', () => {
@@ -1128,11 +1128,11 @@ socket.on('typing', () => {
     });
 
     socket.on('accept_rematch', (data) => {
-        handleAcceptRematch(socket, playerId, data.fromId);
+        handleAcceptRematch(socket, playerId, data?.fromId);
     });
 
     socket.on('decline_rematch', (data) => {
-        handleDeclineRematch(socket, playerId, data.fromId);
+        handleDeclineRematch(socket, playerId, data?.fromId);
     });
 
     socket.on('leave_game', () => {
@@ -1415,6 +1415,7 @@ function handleCancelFind(socket, playerId) {
 }
 /*function handleChat(socket, playerId, text) {
     const player = players[playerId];
+    if (!player) return;
     if (!player || !player.gameId) return;
     const game = games[player.gameId];
     if (!game) return;
