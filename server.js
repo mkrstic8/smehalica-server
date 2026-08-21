@@ -945,6 +945,44 @@ if (players[playerId]) {
                 }
             }
         }
+    } else if (existingPlayer.roomLink) {
+        // Креатор се враћа у собу док игра још није почела.
+        // Користимо постојећи room_created event — без новог reconnect handler-а.
+        const roomLink = existingPlayer.roomLink;
+        const room = rooms[roomLink];
+        const ROOM_TTL_MS = 10 * 60 * 1000;
+
+        const roomIsValid =
+            room &&
+            room.creatorId === playerId &&
+            typeof room.createdAt === 'number' &&
+            (Date.now() - room.createdAt) <= ROOM_TTL_MS;
+
+        if (roomIsValid) {
+            console.log(
+                `🏠 RECONNECT У СОБУ ${roomLink} | ${existingPlayer.name}`
+            );
+
+            socket.emit('room_created', {
+                roomLink: roomLink,
+                message: `Соба поново повезана! Пошаљи линк противнику: ${roomLink}`
+            });
+        } else {
+            if (room && room.creatorId === playerId) {
+                delete rooms[roomLink];
+            }
+
+            existingPlayer.roomLink = null;
+
+            console.log(
+                `⌛ Соба ${roomLink} више није доступна за ` +
+                `${existingPlayer.name}`
+            );
+
+            socket.emit('error', {
+                message: 'Соба је истекла или више није доступна. Направи нову собу.'
+            });
+        }
     }
 
     console.log(
@@ -1159,9 +1197,13 @@ function handleCreateRoom(socket, playerId) {
         console.log(`🔴 Igrač ${playerId.substring(0,8)} uklonjen iz reda zbog kreiranja sobe.`);
     }
 
-    // Ako igrač već ima otvorenu sobu, obriši je pre nego što napravi novu
-    if (player.roomLink && rooms[player.roomLink]) {
-        delete rooms[player.roomLink];
+    // Ако играч већ има отворену собу, обриши је пре него што направи нову.
+    // roomLink чистимо и ако је сам запис собе већ нестао.
+    if (player.roomLink) {
+        if (rooms[player.roomLink]) {
+            delete rooms[player.roomLink];
+        }
+        player.roomLink = null;
     }
 
     const link = generateRoomLink();
@@ -1201,11 +1243,42 @@ function handleJoinRoom(socket, playerId, roomLink) {
         matchmaking.delete(playerId);
         console.log(`🔴 Igrač ${playerId.substring(0,8)} uklonjen iz reda zbog pridruživanja sobi.`);
     }
+
+    // Ако играч има своју стару собу, а сада улази у другу,
+    // стара соба више не сме да остане активна.
+    if (player.roomLink && player.roomLink !== roomLink) {
+        if (rooms[player.roomLink]) {
+            delete rooms[player.roomLink];
+        }
+        player.roomLink = null;
+    }
+
     if (!roomLink || !rooms[roomLink]) {
         socket.emit('error', { message: 'Соба не постоји или је линк неважећи.' });
         return;
     }
     const room = rooms[roomLink];
+    const ROOM_TTL_MS = 10 * 60 * 1000;
+
+    // Не дозволи улазак у истеклу собу чак и ако cleanup interval
+    // још није стигао да је обрише.
+    if (
+        !room ||
+        typeof room.createdAt !== 'number' ||
+        Date.now() - room.createdAt > ROOM_TTL_MS
+    ) {
+        delete rooms[roomLink];
+
+        if (room && players[room.creatorId]?.roomLink === roomLink) {
+            players[room.creatorId].roomLink = null;
+        }
+
+        socket.emit('error', {
+            message: 'Соба је истекла или више није доступна.'
+        });
+        return;
+    }
+
     const creatorId = room.creatorId;
     if (!players[creatorId] || players[creatorId].gameId) {
         delete rooms[roomLink];
@@ -1260,6 +1333,20 @@ function handleFindGame(socket, playerId) {
     if (remaining > 0) {
         socket.emit('error', { message: `Сачекај ${remaining} секунди пре нове претраге.`, cooldownSeconds: remaining });
         return;
+    }
+
+    // Quick Match и чекање у сопственој соби су међусобно искључиви.
+    // Ако играч пређе на Quick Match, његова стара соба се гаси.
+    if (player.roomLink) {
+        if (rooms[player.roomLink]) {
+            delete rooms[player.roomLink];
+        }
+        player.roomLink = null;
+
+        console.log(
+            `🏠 Стара соба играча ${playerId.substring(0,8)} ` +
+            `обрисана због Quick Match-а.`
+        );
     }
 
     if (matchmaking.has(playerId)) {
@@ -1936,6 +2023,10 @@ setInterval(() => {
     }
     for (const [link, room] of Object.entries(rooms)) {
         if (now - room.createdAt > 10 * 60 * 1000) {
+            if (room && players[room.creatorId]?.roomLink === link) {
+                players[room.creatorId].roomLink = null;
+            }
+
             delete rooms[link];
             console.log(`🧹 Očišćena soba ${link}`);
         }
@@ -1945,6 +2036,10 @@ setInterval(() => {
         if (!player.socket && !player.gameId && !matchmaking.has(pid)) {
             const lastSeen = player.lastCancelTime || 0;
             if (now - lastSeen > 60 * 60 * 1000) {
+                if (player.roomLink && rooms[player.roomLink]) {
+                    delete rooms[player.roomLink];
+                }
+
                 delete players[pid];
             }
         }
