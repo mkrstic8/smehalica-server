@@ -39,11 +39,11 @@ const letterValues = {
 };
 
 const tileDistribution = [
-    ['А',9], ['Б',2], ['В',4], ['Г',2], ['Д',4],
-    ['Ђ',1], ['Е',10], ['Ж',2], ['З',2], ['И',8],
+    ['А',10], ['Б',2], ['В',4], ['Г',2], ['Д',4],
+    ['Ђ',1], ['Е',10], ['Ж',2], ['З',2], ['И',10],
     ['Ј',3], ['К',3], ['Л',3], ['Љ',1], ['М',3],
     ['Н',6], ['Њ',1], ['О',9], ['П',3], ['Р',6],
-    ['С',6], ['Т',5], ['Ћ',1], ['У',4], ['Ф',1],
+    ['С',6], ['Т',5], ['Ћ',1], ['У',5], ['Ф',1],
     ['Х',2], ['Ц',2], ['Ч',2], ['Џ',1], ['Ш',2]
 ];
 
@@ -124,16 +124,105 @@ function isValidLetter(letter) {
 // ==================== POMOĆNE FUNKCIJE ====================
 function createBag() {
     const bag = [];
+
+    // 1. Направи комплетну врећу по постојећој дистрибуцији
     for (const [letter, count] of tileDistribution) {
-        for (let i = 0; i < count; i++) bag.push(letter);
+        for (let i = 0; i < count; i++) {
+            bag.push(letter);
+        }
     }
+
+    const vowels = new Set(['А', 'Е', 'И', 'О', 'У']);
+
+    // Ретка/тешка слова – прилагоди ако твој tileDistribution
+    // користи другачију поделу.
+    const rareLetters = new Set([
+        'Ђ', 'Љ', 'Њ', 'Ћ', 'Џ', 'Ф', 'Х', 'Ц'
+    ]);
+
+    const isVowel = letter => vowels.has(letter);
+    const isRare = letter => rareLetters.has(letter);
+
+    // 2. Насумично измешај почетну врећу
     for (let i = bag.length - 1; i > 0; i--) {
         const j = crypto.randomInt(i + 1);
         [bag[i], bag[j]] = [bag[j], bag[i]];
     }
-    return bag;
-}
 
+    // 3. Покушај више пута да добијемо добру расподелу.
+    // Не мењамо садржај вреће, само позиције.
+    function scoreArrangement(arr) {
+        let penalty = 0;
+
+        for (let i = 0; i < arr.length; i++) {
+
+            // Највише 2 ретка слова у непосредном низу
+            if (i >= 2 &&
+                isRare(arr[i]) &&
+                isRare(arr[i - 1]) &&
+                isRare(arr[i - 2])) {
+                penalty += 8;
+            }
+
+            // Више од 3 сугласника заредом
+            if (i >= 3 &&
+                !isVowel(arr[i]) &&
+                !isVowel(arr[i - 1]) &&
+                !isVowel(arr[i - 2]) &&
+                !isVowel(arr[i - 3])) {
+                penalty += 5;
+            }
+
+            // Више од 3 самогласника заредом
+            if (i >= 3 &&
+                isVowel(arr[i]) &&
+                isVowel(arr[i - 1]) &&
+                isVowel(arr[i - 2]) &&
+                isVowel(arr[i - 3])) {
+                penalty += 5;
+            }
+
+            // Два ретка слова веома близу једно другом
+            if (i >= 1 &&
+                isRare(arr[i]) &&
+                isRare(arr[i - 1])) {
+                penalty += 2;
+            }
+        }
+
+        return penalty;
+    }
+
+    // 4. Изабери најбоље од више случајних мешања
+    let bestBag = bag.slice();
+    let bestScore = scoreArrangement(bestBag);
+
+    const attempts = Math.min(100, Math.max(20, bag.length));
+
+    for (let attempt = 0; attempt < attempts; attempt++) {
+        const candidate = bag.slice();
+
+        for (let i = candidate.length - 1; i > 0; i--) {
+            const j = crypto.randomInt(i + 1);
+            [candidate[i], candidate[j]] =
+                [candidate[j], candidate[i]];
+        }
+
+        const score = scoreArrangement(candidate);
+
+        if (score < bestScore) {
+            bestScore = score;
+            bestBag = candidate;
+        }
+
+        // Ако је распоред већ веома добар, нема потребе даље мешати
+        if (bestScore === 0) {
+            break;
+        }
+    }
+
+    return bestBag;
+}
 function drawTiles(bag, n) {
     const drawn = [];
     for (let i = 0; i < n; i++) {
