@@ -21,7 +21,7 @@ const bonusBoard = [
     ['','','','','DW','','','','','','DW','','','',''],
     ['','TL','','','','TL','','','','TL','','','','TL',''],
     ['','','DL','','','','DL','','DL','','','','DL','',''],
-    ['TW','','','DL','','','','★','','','','DL','','','TW'],
+    ['TW','','','DL','','','','❖','','','','DL','','','TW'],
     ['','','DL','','','','DL','','DL','','','','DL','',''],
     ['','TL','','','','TL','','','','TL','','','','TL',''],
     ['','','','','DW','','','','','','DW','','','',''],
@@ -39,10 +39,10 @@ const letterValues = {
 };
 
 const tileDistribution = [
-    ['А',10], ['Б',2], ['В',4], ['Г',2], ['Д',4],
+    ['А',9], ['Б',2], ['В',4], ['Г',2], ['Д',4],
     ['Ђ',1], ['Е',10], ['Ж',2], ['З',2], ['И',10],
-    ['Ј',3], ['К',3], ['Л',3], ['Љ',1], ['М',3],
-    ['Н',6], ['Њ',1], ['О',9], ['П',3], ['Р',6],
+    ['Ј',4], ['К',3], ['Л',3], ['Љ',1], ['М',3],
+    ['Н',6], ['Њ',1], ['О',8], ['П',3], ['Р',6],
     ['С',6], ['Т',5], ['Ћ',1], ['У',5], ['Ф',1],
     ['Х',2], ['Ц',2], ['Ч',2], ['Џ',1], ['Ш',2]
 ];
@@ -461,7 +461,7 @@ for (const p of placements) {
         const coversCenter = tempBoard.some(p => p.row === 7 && p.col === 7);
         if (!coversCenter) {
             for (const p of tempBoard) board[p.row][p.col] = null;
-            return { valid: false, error: 'Први потез мора покрити центар (★).' };
+            return { valid: false, error: 'Први потез мора покрити центар (❖).' };
         }
     } else {
         // Mora biti povezano sa postojećim rečima
@@ -544,7 +544,7 @@ for (const p of placements) {
 
     if (invalidWords.length > 0) {
         for (const p of tempBoard) board[p.row][p.col] = null;
-        return { valid: false, error: 'Неважеће речи: ' + invalidWords.join(', ') };
+        return { valid: false, error: 'Грешка' + invalidWords.join(', ') };
     }
 
     // Izračunaj skor
@@ -561,7 +561,7 @@ for (const p of placements) {
                 if (bonus === 'TL') lv *= 3;
                 if (bonus === 'DW') wordMultiplier *= 2;
                 if (bonus === 'TW') wordMultiplier *= 3;
-                if (bonus === '★') wordMultiplier *= 2;
+                if (bonus === '❖') wordMultiplier *= 2;
             }
             wordScore += lv;
         }
