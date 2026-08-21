@@ -332,18 +332,18 @@ function getGameState(game, playerId) {
 function validateMove(game, playerId, placements) {
     const seen = new Set();
 
-for (const p of placements) {
-    const key = `${p.row},${p.col}`;
+    for (const p of placements) {
+        const key = `${p.row},${p.col}`;
 
-    if (seen.has(key)) {
-        return {
-            valid: false,
-            error: 'Дуплирана позиција плочице.'
-        };
+        if (seen.has(key)) {
+            return {
+                valid: false,
+                error: 'Дуплирана позиција плочице.'
+            };
+        }
+
+        seen.add(key);
     }
-
-    seen.add(key);
-}
     if (game.currentTurn !== playerId) {
         return { valid: false, error: 'Није твој потез.' };
     }
@@ -899,6 +899,7 @@ io.on('connection', (socket) => {
     // Ako igrač već postoji u players, ažuriraj socket i otkaži disconnect tajmer
 if (players[playerId]) {
     const existingPlayer = players[playerId];
+    existingPlayer.lastSeen = Date.now();
 
     // ------------------------------------------------
     // НОВИ SOCKET ПОСТАЈЕ ЈЕДИНИ ВАЖЕЋИ SOCKET
@@ -1013,6 +1014,7 @@ if (players[playerId]) {
         name: 'Играч',
         disconnectTimer: null,
         lastCancelTime: 0,
+        lastSeen: Date.now(),
         roomLink: null,
         lastChatTime: 0,
         lastTypingTime: 0,
@@ -1537,8 +1539,17 @@ if (game.bag.length === 0) {
         let p1Deduction = 0, p2Deduction = 0;
         for (const l of p1Rack) p1Deduction += letterValues[l] || 0;
         for (const l of p2Rack) p2Deduction += letterValues[l] || 0;
-        game.players[playerId].score -= p1Deduction;
-        game.players[opponentId].score -= p2Deduction;
+        // Završni obračun po Scrabble pravilu:
+        // igrač koji ostane bez pločica dobija vrednost svih
+        // preostalih pločica protivnika, a protivniku se ta vrednost oduzima.
+        if (p1Rack.length === 0) {
+            game.players[playerId].score += p2Deduction;
+            game.players[opponentId].score -= p2Deduction;
+        } else if (p2Rack.length === 0) {
+            game.players[opponentId].score += p1Deduction;
+            game.players[playerId].score -= p1Deduction;
+        }
+
         const p1Score = game.players[playerId].score;
         const p2Score = game.players[opponentId].score;
         if (p1Score > p2Score) winner = playerId;
@@ -1561,12 +1572,9 @@ for (const pid of Object.keys(game.players)) {
         if (winner === 'draw') state.resultMessage = '🤝 Нерешено!';
         else if (winner === pid) state.resultMessage = '🎉 Победио/ла си!';
         else state.resultMessage = '😞 Изгубио/ла си.';
-        const opponentIdForState =
-            pid === playerId ? opponentId : playerId;
-
         state.finalScores = {
             you: game.players[pid].score,
-            opponent: game.players[opponentIdForState].score
+            opponent: game.players[opponentId].score
         };
     }
     sendToPlayer(pid, state.type, state);
@@ -1629,13 +1637,10 @@ function handleSkipTurn(socket, playerId) {
                 : winner === pid
                     ? 'Нема више добрих потеза, рачунам скор. Победио/ла си!🎉 '
                     : ' Нема више добрих потеза, рачунам скор. Изгубио/ла си. 😞';
-const opponentIdForState =
-    pid === playerId ? opponentId : playerId;
-
-state.finalScores = {
-    you: game.players[pid].score,
-    opponent: game.players[opponentIdForState].score
-};
+            state.finalScores = {
+                you: game.players[pid].score,
+                opponent: game.players[opponentId].score
+            };
         }
         sendToPlayer(pid, state.type, state);
     }
@@ -1943,6 +1948,9 @@ function handleDisconnect(socket, playerId) {
         `(playerId: ${playerId.substring(0, 8)})`
     );
 
+    // Zabeleži poslednji trenutak kada je igrač bio viđen.
+    player.lastSeen = Date.now();
+
     // Odmah označi igrača kao offline.
     player.socket = null;
 
@@ -2055,7 +2063,7 @@ setInterval(() => {
     // NOVO: očisti igrače koji su offline duže od 1h i nisu u aktivnoj igri
     for (const [pid, player] of Object.entries(players)) {
         if (!player.socket && !player.gameId && !matchmaking.has(pid)) {
-            const lastSeen = player.lastCancelTime || 0;
+            const lastSeen = player.lastSeen || 0;
             if (now - lastSeen > 60 * 60 * 1000) {
                 if (player.roomLink && rooms[player.roomLink]) {
                     delete rooms[player.roomLink];
