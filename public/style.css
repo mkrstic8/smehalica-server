@@ -196,7 +196,7 @@ h1 {
 .cell.dw::after { content:'2Р'; }
 .cell.tl::after { content:'3С'; }
 .cell.dl::after { content:'2С'; }
-.cell.star::after { content:'★'; font-size:0.8rem; }
+.cell.star::after { content:'❖'; font-size:0.8rem; }
 
 .cell.occupied.tw::after,
 .cell.occupied.dw::after,
