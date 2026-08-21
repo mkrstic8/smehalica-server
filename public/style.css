@@ -551,6 +551,17 @@ button:disabled {
     line-height: 1.5;
     margin: 0;
 }
+.your-turn {
+    color: #fff !important;
+    background: #1976d2 !important;
+    font-weight: 700;
+}
+
+.opponent-turn {
+    color: #fff !important;
+    background: #d32f2f !important;
+    font-weight: 700;
+}
 /* ==================== ANIMACIJE POLJA ==================== */
 
 .cell-bounce {
@@ -596,6 +607,20 @@ button:disabled {
         transform: translateX(5px);
     }
 }
+/* ==================== KONFETE ==================== */
+
+@keyframes confettiFall {
+    0% {
+        transform: translateY(0) rotate(0deg);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translateY(110vh) rotate(720deg);
+        opacity: 0;
+    }
+}
+
 @media (max-width: 600px) {
   h1 { font-size: 1.2rem; }
   button { padding: 6px 10px; font-size: 0.7rem; }

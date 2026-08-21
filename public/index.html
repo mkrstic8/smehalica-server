@@ -17,14 +17,14 @@
 </head>
 <body>
 
-    <h1>🎯 Смехалица укрштеница</h1>
+    <h1>🧩 Смехалица укрштеница</h1>
     <p class="subtitle" id="connectionStatus">
         <span class="connection-dot disconnected"></span> Повезивање...
     </p>
 
     <div class="overlay" id="nameOverlay">
         <div class="overlay-content" id="nameScreen">
-            <h2>🎯 Смехалица</h2>
+                    <h2>😄 Смехалица</h2>
             <p style="margin-bottom:10px;">Унеси своје име:</p>
             <input type="text" id="nameInput" placeholder="Твоје име" maxlength="20" value="Играч">
             <br>
@@ -33,7 +33,7 @@
             </button>
         </div>
         <div class="overlay-content" id="optionsScreen" style="display:none;">
-            <h2>🎯 Изабери начин игре</h2>
+<h2>🎮 Изабери начин игре</h2>
             <button class="btn-success" id="btnQuickMatch" onclick="quickMatch()" style="width:100%;padding:12px;margin-bottom:8px;">
                 ⚡ БРЗА ИГРА
             </button>
@@ -154,7 +154,7 @@
         </div>
 
         <div class="rack-container">
-            <span class="rack-label">🎴 Ти:</span>
+            <span class="rack-label">Ти:</span>
             <div class="rack" id="rack"></div>
         </div>
 
@@ -720,41 +720,69 @@ socket.io.on('reconnect', () => {
             showScreen('optionsScreen');
         }
 
-        function startGame(msg, isResume = false) {
-            // Ukloni zaostale dinamičke dugmiće iz prethodne igre
-            removeRematchButton();
-            const oldMenuBtn = document.getElementById('menuBtn');
-            if (oldMenuBtn) oldMenuBtn.remove();
-            
-            // Vrati sva akciona dugmad
-            showAllActionButtons();
-            
-            showScreen('game');
-            gameId = msg.gameId;
-            gameActive = true;
-            gameIsOver = false;
-            document.getElementById('yourNameLabel').textContent = '👤 Ти';
-            document.getElementById('opponentNameLabel').textContent = '🤖 ' + msg.opponentName;
-            updateGameState(msg);
-            
-            // Prikaži odgovarajuću poruku
-            if (isResume) {
-                setMessage('🔄 Веза обновљена, игра настављена.', 'info', 3000);
-            } else {
-                setMessage('🎮 Игра почиње! ' + (msg.isYourTurn ? 'Ти си на потезу.' : 'Противник је на потезу.'), 'info', 3000);
-            }
-            // Ako smo propustili live 'move_result' (npr. veza je pala usred poteza),
-            // javi u čet šta je poslednje odigrano - podatak je uvek u msg.lastMove.
+function startGame(msg, isResume = false) {
 
-            if (msg.lastMove && msg.lastMove.words && msg.lastMove.words.length > 0) {
-                const isMyLastMove = msg.lastMove.playerId === playerId;
-                if (isMyLastMove) {
-                    addChatSystemMsg(`🎯 Ти играш: ${msg.lastMove.words.join(', ')} (+${msg.lastMove.score})`);
-                } else {
-                    addChatSystemMsg(`${msg.opponentName || 'Противник'} игра: ${msg.lastMove.words.join(', ')} (+${msg.lastMove.score})`);
-                }
-            }
+    // Потпуно ресетуј локално стање за нову игру
+    lastServerStateVersion = -1;
+    currentBoardState = null;
+    newlyPlacedCells = [];
+    selectedTileIndex = null;
+    myRack = [];
+    isMyTurn = false;
+    gameIsOver = false;
+    gameActive = true;
+
+    removeRematchButton();
+
+    const oldMenuBtn = document.getElementById('menuBtn');
+    if (oldMenuBtn) oldMenuBtn.remove();
+
+    showAllActionButtons();
+
+    showScreen('game');
+
+    gameId = msg.gameId;
+
+    document.getElementById('yourNameLabel').textContent = '👤 Ти';
+    document.getElementById('opponentNameLabel').textContent =
+        '🤖 ' + msg.opponentName;
+
+    updateGameState(msg);
+
+    if (isResume) {
+        setMessage(
+            '🔄 Веза обновљена, игра настављена.',
+            'info',
+            3000
+        );
+    } else {
+        setMessage(
+            '🎮 Игра почиње! ' +
+            (msg.isYourTurn
+                ? 'Ти си на потезу.'
+                : 'Противник је на потезу.'),
+            'info',
+            3000
+        );
+    }
+
+    if (msg.lastMove &&
+        msg.lastMove.words &&
+        msg.lastMove.words.length > 0) {
+
+        const isMyLastMove = msg.lastMove.playerId === playerId;
+
+        if (isMyLastMove) {
+            addChatSystemMsg(
+                `🎯 Ти играш: ${msg.lastMove.words.join(', ')} (+${msg.lastMove.score})`
+            );
+        } else {
+            addChatSystemMsg(
+                `${msg.opponentName || 'Противник'} игра: ${msg.lastMove.words.join(', ')} (+${msg.lastMove.score})`
+            );
         }
+    }
+}
  function updateGameState(msg) {
 
     // ---------------------------------------------
@@ -1002,20 +1030,25 @@ socket.io.on('reconnect', () => {
             if (gameIsOver) {
                 indicator.textContent = '🏁 КРАЈ ИГРЕ';
                 indicator.classList.add('game-over-state');
+
                 yBox.classList.remove('active-player');
                 oBox.classList.remove('active-player');
+
             } else if (myTurn) {
                 indicator.textContent = '🔵 ТВОЈ ПОТЕЗ';
                 indicator.classList.add('your-turn');
+
                 yBox.classList.add('active-player');
                 oBox.classList.remove('active-player');
+
             } else {
-                indicator.textContent = '🟠 ПРОТИВНИК НА ПОТЕЗУ';
+                indicator.textContent = '🔴 ПРОТИВНИК НА ПОТЕЗУ';
                 indicator.classList.add('opponent-turn');
+
                 yBox.classList.remove('active-player');
                 oBox.classList.add('active-player');
             }
-        }
+}
 
         let messageTimeout = null;
         function setMessage(msg, type, duration = 3000) {

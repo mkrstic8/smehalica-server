@@ -1149,9 +1149,22 @@ function handleJoinRoom(socket, playerId, roomLink) {
 function handleFindGame(socket, playerId) {
     const player = players[playerId];
     if (!player) return;
+
+    // Ако је претходна игра завршена,
+    // ослободи играча за нову брзу игру.
     if (player.gameId) {
-        socket.emit('error', { message: 'Већ си у игри.' });
-        return;
+        const existingGame = games[player.gameId];
+
+        if (existingGame && existingGame.status === 'finished') {
+            player.gameId = null;
+            player.playerNum = null;
+            player.roomLink = null;
+        } else {
+            socket.emit('error', {
+                message: 'Већ си у игри.'
+            });
+            return;
+        }
     }
 
     const remaining = getCooldownRemaining(player);
@@ -1420,8 +1433,8 @@ function handleSkipTurn(socket, playerId) {
             state.resultMessage = winner === 'draw'
                 ? '🤝 Нерешено! Оба играча су прескочила 4 пута.'
                 : winner === pid
-                    ? '🎉 Победио/ла си! Противник је прескочио превише пута.'
-                    : '😞 Изгубио/ла си. Превише прескакања.';
+                    ? 'Нема више добрих потеза, рачунам скор. Победио/ла си!🎉 '
+                    : ' Нема више добрих потеза, рачунам скор. Изгубио/ла си. 😞';
             state.finalScores = {
                 you: game.players[pid].score,
                 opponent: game.players[opponentId].score
