@@ -332,17 +332,26 @@ function getGameState(game, playerId) {
 function validateMove(game, playerId, placements) {
     const seen = new Set();
 
-    for (const p of placements) {
-        const key = `${p.row},${p.col}`;
 
-        if (seen.has(key)) {
-            return {
-                valid: false,
-                error: 'Дуплирана позиција плочице.'
-            };
-        }
+for (const p of placements) {
 
-        seen.add(key);
+    if (!p || typeof p !== 'object') {
+        return {
+            valid: false,
+            error: 'Неисправан податак о плочици.'
+        };
+    }
+
+    const key = `${p.row},${p.col}`;
+
+    if (seen.has(key)) {
+        return {
+            valid: false,
+            error: 'Дуплирана позиција плочице.'
+        };
+    }
+
+    seen.add(key);
     }
     if (game.currentTurn !== playerId) {
         return { valid: false, error: 'Није твој потез.' };
