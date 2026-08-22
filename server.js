@@ -975,6 +975,31 @@ if (players[playerId]) {
                         }
                     );
                 }
+
+                // Ако је у игри из собе већ затражен реванш док је
+                // овај играч био offline, пошаљи му захтев сада.
+                if (
+                    activeGame.status === 'finished' &&
+                    activeGame.isRoomGame &&
+                    activeGame.rematchRequestedBy === opponentId
+                ) {
+                    const requester = players[opponentId];
+
+                    sendToPlayer(
+                        playerId,
+                        'rematch_request',
+                        {
+                            fromId: opponentId,
+                            fromName: requester?.name || 'Играч',
+                            message: `${requester?.name || 'Играч'} жели реванш!`
+                        }
+                    );
+
+                    console.log(
+                        `🔄 Захтев за реванш послат после reconnect-а: ` +
+                        `${requester?.name || opponentId} -> ${existingPlayer.name}`
+                    );
+                }
             }
         }
     } else if (existingPlayer.roomLink) {
@@ -1325,6 +1350,7 @@ function handleJoinRoom(socket, playerId, roomLink) {
     }
 
     const game = createGame(creatorId, playerId);
+    game.isRoomGame = true;
     players[creatorId].roomLink = null;   // <-- DODATO
 
     const state1 = getGameState(game, creatorId);
@@ -1693,6 +1719,10 @@ function handleGetState(socket, playerId) {
             state.resultMessage = '😞 Изгубио/ла си.';
         }
 
+        if (game.resignedByName) {
+            state.resignedByName = game.resignedByName;
+        }
+
         state.finalScores = Object.entries(game.players)
             .map(([id, player]) => ({
                 name: players[id]?.name || 'Играч',
@@ -1717,6 +1747,7 @@ function handleResign(socket, playerId) {
     const opponentId = Object.keys(game.players).find(id => id !== playerId);
     game.status = 'finished';
     game.winner = opponentId;
+    game.resignedByName = player.name;
 
     for (const pid of Object.keys(game.players)) {
         const state = getGameState(game, pid);
@@ -1742,6 +1773,8 @@ function handleChat(socket, playerId, text) {
     if (typeof text !== 'string' || text.trim().length === 0) return;
 
     const player = players[playerId];
+    if (!player) return;
+
     const now = Date.now();
 
 if (now - player.lastChatTime < 700) {
@@ -1801,8 +1834,24 @@ function handleRematchRequest(socket, playerId) {
     if (!opponentId || !players[opponentId]) return;
 
     player.lastRematchTime = now;
-
     game.rematchRequestedBy = playerId;
+
+    const opponent = players[opponentId];
+    const opponentOnline = !!opponent.socket;
+
+    // За игре започете преко собе: ако је противник offline,
+    // захтев остаје сачуван и биће му приказан када се reconnect-ује.
+    if (game.isRoomGame && !opponentOnline) {
+        socket.emit('rematch_sent', {
+            message: '⏳ Противник тренутно није повезан. Захтев за реванш је сачуван и биће му послат када се врати.'
+        });
+
+        console.log(
+            `🔄 ${player.name} traži revanš od ${opponent.name} ` +
+            `(protivnik offline, čeka reconnect)`
+        );
+        return;
+    }
 
     sendToPlayer(opponentId, 'rematch_request', {
         fromId: playerId,
@@ -1815,9 +1864,10 @@ function handleRematchRequest(socket, playerId) {
     });
 
     console.log(
-        `🔄 ${player.name} traži revanš od ${players[opponentId].name}`
+        `🔄 ${player.name} traži revanš od ${opponent.name}`
     );
 }
+
 function handleAcceptRematch(socket, playerId, fromId) {
     const player = players[playerId];
 
