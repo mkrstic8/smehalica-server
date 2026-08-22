@@ -1289,21 +1289,25 @@ function startGame(msg, isResume = false) {
         hideAllActionButtons();
 
         updateTurnIndicator(false);
-        let scoreText = '';
+let message = '🏁 ' + (msg.resultMessage || 'Игра је завршена.');
 
-if (Array.isArray(msg.finalScores)) {
-    scoreText = msg.finalScores
+if (msg.resignedByName) {
+    if (msg.resignedByName !== myName) {
+        message = '🏁 Победио/ла си предајом противника';
+    } else {
+        message = '🏁 Предао/ла си се.';
+    }
+} else if (Array.isArray(msg.finalScores)) {
+    const scoreText = msg.finalScores
         .map(player => `${player.name}: ${player.score}`)
         .join('  |  ');
+
+    if (scoreText) {
+        message += '  ' + scoreText;
+    }
 }
 
-setMessage(
-    '🏁 ' +
-    (msg.resultMessage || 'Игра је завршена.') +
-    (scoreText ? '  ' + scoreText : ''),
-    'info',
-    0
-);
+setMessage(message, 'info', 0);
         
         setTimeout(() => {
             showInterstitial();

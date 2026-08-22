@@ -1635,10 +1635,9 @@ function handleSkipTurn(socket, playerId) {
         if (gameOver) {
             state.gameOver = true;
             state.resultMessage = winner === 'draw'
-                ? '🤝 Нерешено! Оба играча су прескочила 4 пута.'
-                : winner === pid
-                    ? 'Нема више добрих потеза, рачунам скор. Победио/ла си!🎉 '
-                    : ' Нема више добрих потеза, рачунам скор. Изгубио/ла си. 😞';
+                state.resultMessage = winner === 'draw'
+    ? '🤝 Игра је завршена након 4 прескочена потеза. Нерешено!'
+    : '🏁 Игра је завршена након 4 прескочена потеза, побеђује играч са више поена.';
             state.finalScores = Object.entries(game.players)
                 .map(([id, player]) => ({
                     name: players[id]?.name || 'Играч',
