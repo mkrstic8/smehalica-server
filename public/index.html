@@ -448,8 +448,7 @@ socket.on('connected', (data) => {
         socket.on('move_invalid', (msg) => {
             moveInFlight = false;
             sfxInvalid();
-            newlyPlacedCells.forEach(p => animateCell(p.row, p.col, 'shake'));
-            errorMsg('❌' + msg.error);
+            submittedCells.forEach(p => animateCell(p.row, p.col, 'shake'));            errorMsg('❌' + msg.error);
             requestStateFromServer();
         });
 
@@ -1201,22 +1200,35 @@ function startGame(msg, isResume = false) {
 
             let moveInFlight = false;
 //d//
-    function submitMove() {
-                if (!isMyTurn || !gameActive || gameIsOver || moveInFlight) return;
-                if (newlyPlacedCells.length === 0) {
-                    errorMsg('⚠ Постави бар једно слово на таблу!');
-                    return;
-                }
-                const placements = newlyPlacedCells.map(p => ({ row: p.row, col: p.col, letter: p.letter }));
-                moveInFlight = true;
-                document.getElementById('btnSubmit').disabled = true;
-                isMyTurn = false;
-                updateTurnIndicator(false);
-                sendMessage('place_tiles', { placements });
-                newlyPlacedCells = [];
-                selectedTileIndex = null;
-                quickMsg('⏳ Шаљем потез на проверу...');        
-            }
+function submitMove() {
+
+    if (!isMyTurn || !gameActive || gameIsOver || moveInFlight) return;
+
+    if (newlyPlacedCells.length === 0) {
+        errorMsg('⚠ Постави бар једно слово на таблу!');
+        return;
+    }
+
+    const placements = newlyPlacedCells.map(p => ({
+        row: p.row,
+        col: p.col,
+        letter: p.letter
+    }));
+
+    submittedCells = [...newlyPlacedCells];
+
+    moveInFlight = true;
+    document.getElementById('btnSubmit').disabled = true;
+    isMyTurn = false;
+    updateTurnIndicator(false);
+
+    sendMessage('place_tiles', { placements });
+
+    newlyPlacedCells = [];
+    selectedTileIndex = null;
+
+    quickMsg('⏳ Шаљем потез на проверу...');
+}
 
     function skipTurn() {
                 if (!isMyTurn || !gameActive || gameIsOver) return;

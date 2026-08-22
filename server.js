@@ -1647,18 +1647,20 @@ function handleSkipTurn(socket, playerId) {
         const state = getGameState(game, pid);
         state.type = gameOver ? 'game_over' : 'turn_skipped';
         state.skippedByName = players[playerId].name;
-        if (gameOver) {
-            state.gameOver = true;
-            state.resultMessage = winner === 'draw'
-                state.resultMessage = winner === 'draw'
-    ? '🤝 Игра је завршена након 4 прескочена потеза. Нерешено!'
-    : '🏁 Игра је завршена након 4 прескочена потеза, побеђује играч са више поена.';
-            state.finalScores = Object.entries(game.players)
-                .map(([id, player]) => ({
-                    name: players[id]?.name || 'Играч',
-                    score: player.score
-                }));
-        }
+if (gameOver) {
+
+    state.gameOver = true;
+
+    state.resultMessage = winner === 'draw'
+        ? '🤝 Игра је завршена након 4 прескочена потеза. Нерешено!'
+        : '🏁 Игра је завршена након 4 прескочена потеза, побеђује играч са више поена.';
+
+    state.finalScores = Object.entries(game.players)
+        .map(([id, player]) => ({
+            name: players[id]?.name || 'Играч',
+            score: player.score
+        }));
+}
         sendToPlayer(pid, state.type, state);
     }
     console.log(`⏭ Igra ${game.id}: ${players[playerId].name} preskače (skip ${game.skipCount}/4)`);
