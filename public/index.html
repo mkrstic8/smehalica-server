@@ -472,7 +472,7 @@ socket.on('connected', (data) => {
             if (!gameActive && !gameIsOver) {
                 // Igra je završena dok nismo bili povezani - prikaži je sada
                 showScreen('game');
-                document.getElementById('yourNameLabel').textContent = '👤 Ти';
+                document.getElementById('yourNameLabel').textContent = '👤 ' + myName;
                 document.getElementById('opponentNameLabel').textContent = '🤖 ' + (msg.opponentName || 'Противник');
             }
             updateGameState(msg);
@@ -722,7 +722,9 @@ function startGame(msg, isResume = false) {
 
     gameId = msg.gameId;
 
-    document.getElementById('yourNameLabel').textContent = '👤 Ти';
+    document.getElementById('yourNameLabel').textContent = '👤 ' + myName;
+    document.getElementById('opponentNameLabel').textContent =
+    '🤖 ' + msg.opponentName;
     document.getElementById('opponentNameLabel').textContent =
         '🤖 ' + msg.opponentName;
 
