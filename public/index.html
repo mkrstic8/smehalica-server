@@ -766,7 +766,8 @@ function startGame(msg, isResume = false) {
         );
     }
 
-    if (msg.lastMove &&
+    if (!isResume &&
+        msg.lastMove &&
         msg.lastMove.words &&
         msg.lastMove.words.length > 0) {
 
