@@ -332,26 +332,17 @@ function getGameState(game, playerId) {
 function validateMove(game, playerId, placements) {
     const seen = new Set();
 
+    for (const p of placements) {
+        const key = `${p.row},${p.col}`;
 
-for (const p of placements) {
+        if (seen.has(key)) {
+            return {
+                valid: false,
+                error: 'Дуплирана позиција плочице.'
+            };
+        }
 
-    if (!p || typeof p !== 'object') {
-        return {
-            valid: false,
-            error: 'Неисправан податак о плочици.'
-        };
-    }
-
-    const key = `${p.row},${p.col}`;
-
-    if (seen.has(key)) {
-        return {
-            valid: false,
-            error: 'Дуплирана позиција плочице.'
-        };
-    }
-
-    seen.add(key);
+        seen.add(key);
     }
     if (game.currentTurn !== playerId) {
         return { valid: false, error: 'Није твој потез.' };
@@ -719,31 +710,20 @@ const httpServer = http.createServer((req, res) => {
             dictionarySize: DICTIONARY.size,
             waitingPlayers: matchmaking.size
         }));
-    } else if (pathname === '/favicon.ico') {
-        // постојећи favicon код...
-
-    } else if (pathname === '/pravila.png') {
-        const filePath = path.join(__dirname, 'public', 'pravila.png');
-
+         } else if (pathname === '/favicon.ico') {
+        const filePath = path.join(__dirname, 'public', 'favicon.ico');
         try {
-            const image = fs.readFileSync(filePath);
-
+            const icon = fs.readFileSync(filePath);
             res.writeHead(200, {
                 ...SECURITY_HEADERS,
                 'Content-Type': 'image/png',
-                'Cache-Control': 'no-cache'
+                'Cache-Control': 'public, max-age=86400'
             });
-
-            res.end(image);
+            res.end(icon);
         } catch (e) {
-            res.writeHead(404, {
-                ...SECURITY_HEADERS,
-                'Content-Type': 'text/plain; charset=utf-8'
-            });
-
-            res.end('pravila.png није пронађен');
+            res.writeHead(204, SECURITY_HEADERS);
+            res.end();
         }
-
     } else {
         res.writeHead(404, {
             ...SECURITY_HEADERS,
@@ -1086,10 +1066,11 @@ if (players[playerId]) {
             state.type = 'game_over';
             state.gameOver = true;
             state.resultMessage = resultMessage;
-            state.finalScores = {
-                you: game.players[playerId].score,
-                opponent: game.players[opponentId] ? game.players[opponentId].score : 0
-            };
+            state.finalScores = Object.entries(game.players)
+                .map(([id, player]) => ({
+                    name: players[id]?.name || 'Играч',
+                    score: player.score
+                }));
             socket.emit('game_over', state);
         }
     }
@@ -1592,10 +1573,11 @@ for (const pid of Object.keys(game.players)) {
         if (winner === 'draw') state.resultMessage = '🤝 Нерешено!';
         else if (winner === pid) state.resultMessage = '🎉 Победио/ла си!';
         else state.resultMessage = '😞 Изгубио/ла си.';
-        state.finalScores = {
-            you: game.players[pid].score,
-            opponent: game.players[opponentId].score
-        };
+        state.finalScores = Object.entries(game.players)
+            .map(([id, player]) => ({
+                name: players[id]?.name || 'Играч',
+                score: player.score
+            }));
     }
     sendToPlayer(pid, state.type, state);
 }
@@ -1657,10 +1639,11 @@ function handleSkipTurn(socket, playerId) {
                 : winner === pid
                     ? 'Нема више добрих потеза, рачунам скор. Победио/ла си!🎉 '
                     : ' Нема више добрих потеза, рачунам скор. Изгубио/ла си. 😞';
-            state.finalScores = {
-                you: game.players[pid].score,
-                opponent: game.players[opponentId].score
-            };
+            state.finalScores = Object.entries(game.players)
+                .map(([id, player]) => ({
+                    name: players[id]?.name || 'Играч',
+                    score: player.score
+                }));
         }
         sendToPlayer(pid, state.type, state);
     }
@@ -1673,11 +1656,38 @@ function handleGetState(socket, playerId) {
         socket.emit('error', { message: 'Ниси у игри.' });
         return;
     }
+
     const game = games[player.gameId];
     if (!game) return;
+
+    const opponentId = Object.keys(game.players)
+        .find(id => id !== playerId);
+
     const state = getGameState(game, playerId);
+
+    if (game.status === 'finished') {
+        state.type = 'game_over';
+        state.gameOver = true;
+
+        if (game.winner === 'draw') {
+            state.resultMessage = '🤝 Нерешено!';
+        } else if (game.winner === playerId) {
+            state.resultMessage = '🎉 Победио/ла си!';
+        } else {
+            state.resultMessage = '😞 Изгубио/ла си.';
+        }
+
+        state.finalScores = Object.entries(game.players)
+            .map(([id, player]) => ({
+                name: players[id]?.name || 'Играч',
+                score: player.score
+            }));
+
+        socket.emit('game_over', state);
+        return;
+    }
+
     state.type = 'game_state';
-    const opponentId = Object.keys(game.players).find(id => id !== playerId);
     state.opponentName = players[opponentId]?.name || 'Противник';
     socket.emit('game_state', state);
 }
@@ -1700,6 +1710,13 @@ function handleResign(socket, playerId) {
         state.resultMessage = pid === opponentId
             ? '🎉 Противник је одустао! Победио/ла си!'
             : '🏳 Предао/ла си се.';
+
+        state.finalScores = Object.entries(game.players)
+            .map(([id, player]) => ({
+                name: players[id]?.name || 'Играч',
+                score: player.score
+            }));
+
         sendToPlayer(pid, 'game_over', state);
     }
     console.log(`🏳 Igra ${game.id}: ${players[playerId].name} predaje`);

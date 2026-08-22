@@ -1287,7 +1287,21 @@ function startGame(msg, isResume = false) {
         hideAllActionButtons();
 
         updateTurnIndicator(false);
-        setMessage('🏁 ' + (msg.resultMessage || 'Игра је завршена.'), 'info', 0);
+        let scoreText = '';
+
+if (Array.isArray(msg.finalScores)) {
+    scoreText = msg.finalScores
+        .map(player => `${player.name}: ${player.score}`)
+        .join('  |  ');
+}
+
+setMessage(
+    '🏁 ' +
+    (msg.resultMessage || 'Игра је завршена.') +
+    (scoreText ? '  ' + scoreText : ''),
+    'info',
+    0
+);
         
         setTimeout(() => {
             showInterstitial();
