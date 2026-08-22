@@ -719,20 +719,31 @@ const httpServer = http.createServer((req, res) => {
             dictionarySize: DICTIONARY.size,
             waitingPlayers: matchmaking.size
         }));
-         } else if (pathname === '/favicon.ico') {
-        const filePath = path.join(__dirname, 'public', 'favicon.ico');
+    } else if (pathname === '/favicon.ico') {
+        // постојећи favicon код...
+
+    } else if (pathname === '/pravila.png') {
+        const filePath = path.join(__dirname, 'public', 'pravila.png');
+
         try {
-            const icon = fs.readFileSync(filePath);
+            const image = fs.readFileSync(filePath);
+
             res.writeHead(200, {
                 ...SECURITY_HEADERS,
                 'Content-Type': 'image/png',
-                'Cache-Control': 'public, max-age=86400'
+                'Cache-Control': 'no-cache'
             });
-            res.end(icon);
+
+            res.end(image);
         } catch (e) {
-            res.writeHead(204, SECURITY_HEADERS);
-            res.end();
+            res.writeHead(404, {
+                ...SECURITY_HEADERS,
+                'Content-Type': 'text/plain; charset=utf-8'
+            });
+
+            res.end('pravila.png није пронађен');
         }
+
     } else {
         res.writeHead(404, {
             ...SECURITY_HEADERS,
