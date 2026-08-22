@@ -1473,34 +1473,6 @@ function handleCancelFind(socket, playerId) {
         });
     }
 }
-/*function handleChat(socket, playerId, text) {
-    const player = players[playerId];
-    if (!player) return;
-    if (!player || !player.gameId) return;
-    const game = games[player.gameId];
-    if (!game) return;
-
-    const message = {
-        from: player.name,
-        text: text.substring(0, 200),
-        timestamp: Date.now()
-    };
-
-    // Sačuvaj u istoriju igre
-    game.chatMessages.push(message);
-    if (game.chatMessages.length > 100) {
-        game.chatMessages.shift(); // zadrži max 100 poruka
-    }
-
-    // Pošalji poruku direktno obojici igrača
-    for (const pid of Object.keys(game.players)) {
-        const p = players[pid];
-        if (p && p.socket) {
-            p.socket.emit('chat_message', message);
-        }
-    }
-}
-*/
 function handlePlaceTiles(socket, playerId, placements) {
     if (
     !Array.isArray(placements) ||
@@ -1870,7 +1842,14 @@ function handleRematchRequest(socket, playerId) {
 
 function handleAcceptRematch(socket, playerId, fromId) {
     const player = players[playerId];
+    if (player?.rematchUnavailable) {
+    player.rematchUnavailable = false;
 
+    socket.emit('error', {
+        message: 'Реванш више није доступан.'
+    });
+    return;
+}
     if (!player || !player.gameId) {
         socket.emit('error', {
             message: 'Ниси у завршеној игри.'
@@ -2012,7 +1991,11 @@ function handleLeaveGame(socket, playerId) {
     if (opponentId && players[opponentId]) {
         sendToPlayer(opponentId, 'opponent_left', { message: `${player.name} је напустио игру.` });
     }
-
+    // Ако је овај играч понудио реванш, а сада напушта игру,
+// поништи његов pending захтев код противника.
+if (game.rematchRequestedBy === playerId && players[opponentId]) {
+    players[opponentId].rematchUnavailable = true;
+}
     socket.leave(game.id);
     delete games[game.id];
     players[playerId].gameId = null;
