@@ -724,6 +724,23 @@ const httpServer = http.createServer((req, res) => {
             res.writeHead(204, SECURITY_HEADERS);
             res.end();
         }
+    } else if (pathname === '/pravilaigre.png') {
+        const filePath = path.join(__dirname, 'public', 'pravilaigre.png');
+        try {
+            const img = fs.readFileSync(filePath);
+            res.writeHead(200, {
+                ...SECURITY_HEADERS,
+                'Content-Type': 'image/png',
+                'Cache-Control': 'public, max-age=86400'
+            });
+            res.end(img);
+        } catch (e) {
+            res.writeHead(404, {
+                ...SECURITY_HEADERS,
+                'Content-Type': 'text/plain; charset=utf-8'
+            });
+            res.end('pravilaigre.png nije pronađen');
+        }
     } else {
         res.writeHead(404, {
             ...SECURITY_HEADERS,
