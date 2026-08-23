@@ -576,6 +576,145 @@ button:disabled {
     background: #d32f2f !important;
     font-weight: 700;
 }
+/* =========================================================
+   SMEHALICA - NOVA POZADINA ZA IME I MENI
+   ========================================================= */
+
+#nameOverlay {
+    background-image: url('menu-background.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+/* Panel preko slike */
+#nameOverlay .menu-panel {
+    background: rgba(8, 61, 108, 0.90);
+    border: 2px solid rgba(255, 255, 255, 0.20);
+    border-radius: 24px;
+    padding: 24px;
+    width: min(90%, 430px);
+    max-width: 430px;
+    box-shadow:
+        0 12px 35px rgba(0, 0, 0, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+/* Tekst iznad polja za ime */
+#nameOverlay .menu-label {
+    color: #fff;
+    font-size: 1.15rem;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 12px;
+    text-shadow: 1px 2px 3px rgba(0, 0, 0, 0.45);
+}
+
+/* Polje za ime */
+#nameOverlay #nameInput {
+    width: 100%;
+    height: 58px;
+    padding: 10px 16px;
+    border: 2px solid rgba(255, 255, 255, 0.7);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.96);
+    color: #333;
+    font-size: 1.15rem;
+    font-weight: 600;
+    text-align: center;
+    margin-bottom: 14px;
+}
+
+/* Sva nova dugmad */
+#nameOverlay .menu-button {
+    width: 100%;
+    min-height: 58px;
+    border: none;
+    border-radius: 30px;
+    color: white;
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: 0.4px;
+    cursor: pointer;
+    margin-bottom: 10px;
+    box-shadow:
+        0 5px 10px rgba(0, 0, 0, 0.28),
+        inset 0 1px 0 rgba(255, 255, 255, 0.20);
+    transition:
+        transform 0.15s ease,
+        filter 0.15s ease,
+        box-shadow 0.15s ease;
+}
+
+/* Klik / dodir */
+#nameOverlay .menu-button:active {
+    transform: scale(0.97);
+}
+
+/* Hover */
+#nameOverlay .menu-button:hover {
+    filter: brightness(1.08);
+    box-shadow:
+        0 7px 14px rgba(0, 0, 0, 0.32),
+        inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+/* Nastavi */
+#nameOverlay .menu-continue {
+    background: linear-gradient(180deg, #FFD43B 0%, #F5A900 100%);
+}
+
+/* Brza igra */
+#nameOverlay .menu-green {
+    background: linear-gradient(180deg, #4CAF50 0%, #2E8B32 100%);
+}
+
+/* Napravi sobu */
+#nameOverlay .menu-yellow {
+    background: linear-gradient(180deg, #FFD33D 0%, #F5A900 100%);
+}
+
+/* Pridruži се соби */
+#nameOverlay .menu-blue {
+    background: linear-gradient(180deg, #29B6F6 0%, #087FC1 100%);
+}
+
+/* Pravila */
+#nameOverlay .menu-purple {
+    background: linear-gradient(180deg, #A23BEF 0%, #6412A0 100%);
+}
+
+/* Nazad */
+#nameOverlay .menu-orange {
+    background: linear-gradient(180deg, #FF9D19 0%, #EF6C00 100%);
+}
+
+/* Razmak između dugmadi */
+#nameOverlay .menu-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+/* Mobilni telefoni */
+@media (max-width: 480px) {
+
+    #nameOverlay .menu-panel {
+        width: 88%;
+        padding: 20px;
+        border-radius: 22px;
+    }
+
+    #nameOverlay .menu-button {
+        min-height: 54px;
+        font-size: 0.95rem;
+    }
+
+    #nameOverlay #nameInput {
+        height: 54px;
+        font-size: 1.05rem;
+    }
+}
 /* ==================== ANIMACIJE POLJA ==================== */
 
 .cell-bounce {

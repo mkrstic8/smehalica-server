@@ -22,16 +22,28 @@
         <span class="connection-dot disconnected"></span> Повезивање...
     </p>
 
-    <div class="overlay" id="nameOverlay">
-        <div class="overlay-content" id="nameScreen">
-                    <h2>😄 Смехалица</h2>
-            <p style="margin-bottom:10px;">Унеси своје име:</p>
-            <input type="text" id="nameInput" placeholder="Твоје име" maxlength="20" value="Играч">
-            <br>
-            <button class="btn-primary" onclick="showGameOptions()" style="width:100%;padding:12px;">
-                ▶ НАСТАВИ
-            </button>
-        </div>
+<div class="overlay" id="nameOverlay">
+
+    <div class="overlay-content menu-panel" id="nameScreen">
+
+        <p class="menu-label">Унеси своје име:</p>
+
+        <input
+            type="text"
+            id="nameInput"
+            placeholder="Твоје име"
+            maxlength="20"
+            value="Играч"
+        >
+
+        <button
+            class="menu-button menu-continue"
+            onclick="showGameOptions()"
+        >
+            ▶ НАСТАВИ
+        </button>
+
+    </div>
         <div class="overlay-content" id="optionsScreen" style="display:none;">
 <h2>🎮 Изабери начин игре</h2>
             <button class="btn-success" id="btnQuickMatch" onclick="quickMatch()" style="width:100%;padding:12px;margin-bottom:8px;">
