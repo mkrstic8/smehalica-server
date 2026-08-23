@@ -741,6 +741,23 @@ const httpServer = http.createServer((req, res) => {
             });
             res.end('pravilaigre.png nije pronađen');
         }
+} else if (pathname === '/menu-background.png') {   // <-- NOVO
+        const filePath = path.join(__dirname, 'public', 'menu-background.png');
+        try {
+            const img = fs.readFileSync(filePath);
+            res.writeHead(200, {
+                ...SECURITY_HEADERS,
+                'Content-Type': 'image/png',
+                'Cache-Control': 'public, max-age=86400'
+            });
+            res.end(img);
+        } catch (e) {
+            res.writeHead(404, {
+                ...SECURITY_HEADERS,
+                'Content-Type': 'text/plain; charset=utf-8'
+            });
+            res.end('menu-background.png nije pronađen');
+        }
     } else {
         res.writeHead(404, {
             ...SECURITY_HEADERS,
