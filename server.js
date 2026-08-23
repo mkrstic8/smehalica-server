@@ -758,6 +758,23 @@ const httpServer = http.createServer((req, res) => {
             });
             res.end('menu-options-bg3.png nije pronađen');
         }
+        } else if (pathname === '/menu-name-bg.jpg') {
+        const filePath = path.join(__dirname, 'public', 'menu-name-bg.jpg');
+        try {
+            const img = fs.readFileSync(filePath);
+            res.writeHead(200, {
+                ...SECURITY_HEADERS,
+                'Content-Type': 'image/jpeg',
+                'Cache-Control': 'public, max-age=86400'
+            });
+            res.end(img);
+        } catch (e) {
+            res.writeHead(404, {
+                ...SECURITY_HEADERS,
+                'Content-Type': 'text/plain; charset=utf-8'
+            });
+            res.end('menu-name-bg.jpg nije pronađen');
+        }
     } else {
         res.writeHead(404, {
             ...SECURITY_HEADERS,
