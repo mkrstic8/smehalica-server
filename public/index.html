@@ -322,6 +322,10 @@
         }
 
         function showScreen(screenId) {
+            // Aktivni meni koristi vizuelni stil iz novih ekranâ; logika i ID-jevi ostaju isti.
+            document.body.dataset.menuScreen = screenId || '';
+            document.body.classList.toggle('menu-active', screenId !== 'game');
+
             // Sakrij sve overlay ekrane
             document.querySelectorAll('.overlay-content').forEach(el => el.style.display = 'none');
             document.getElementById('nameOverlay').style.display = 'none';
