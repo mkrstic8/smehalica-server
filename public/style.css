@@ -830,6 +830,15 @@ button:disabled {
     flex-direction: column;
     gap: 2px;
 }
+/* Менији при дну екрана */
+#nameOverlay {
+    align-items: flex-end;
+    justify-content: center;
+}
+
+#nameOverlay .overlay-content {
+    margin-bottom: 20px;
+}
 
 /* Mobilni telefoni */
 @media (max-width: 480px) {
@@ -850,6 +859,7 @@ button:disabled {
         font-size: 1.05rem;
     }
 }
+
 /* ==================== ANIMACIJE POLJA ==================== */
 
 .cell-bounce {
