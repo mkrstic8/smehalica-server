@@ -724,7 +724,7 @@ const httpServer = http.createServer((req, res) => {
             res.writeHead(204, SECURITY_HEADERS);
             res.end();
         }
- } else if (pathname === '/pravilaigre.png') {
+    } else if (pathname === '/pravilaigre.png') {
         const filePath = path.join(__dirname, 'public', 'pravilaigre.png');
         try {
             const img = fs.readFileSync(filePath);
@@ -740,40 +740,6 @@ const httpServer = http.createServer((req, res) => {
                 'Content-Type': 'text/plain; charset=utf-8'
             });
             res.end('pravilaigre.png nije pronađen');
-        }
-    } else if (pathname === '/menu-options-bg3.png') {          // <-- ADD THIS BLOCK HERE
-        const filePath = path.join(__dirname, 'public', 'menu-options-bg3.png');
-        try {
-            const img = fs.readFileSync(filePath);
-            res.writeHead(200, {
-                ...SECURITY_HEADERS,
-                'Content-Type': 'image/png',
-                'Cache-Control': 'public, max-age=86400'
-            });
-            res.end(img);
-        } catch (e) {
-            res.writeHead(404, {
-                ...SECURITY_HEADERS,
-                'Content-Type': 'text/plain; charset=utf-8'
-            });
-            res.end('menu-options-bg3.png nije pronađen');
-        }
-        } else if (pathname === '/menu-name-bg.jpg') {
-        const filePath = path.join(__dirname, 'public', 'menu-name-bg.jpg');
-        try {
-            const img = fs.readFileSync(filePath);
-            res.writeHead(200, {
-                ...SECURITY_HEADERS,
-                'Content-Type': 'image/jpeg',
-                'Cache-Control': 'public, max-age=86400'
-            });
-            res.end(img);
-        } catch (e) {
-            res.writeHead(404, {
-                ...SECURITY_HEADERS,
-                'Content-Type': 'text/plain; charset=utf-8'
-            });
-            res.end('menu-name-bg.jpg nije pronađen');
         }
     } else {
         res.writeHead(404, {
@@ -1681,20 +1647,20 @@ function handleSkipTurn(socket, playerId) {
         const state = getGameState(game, pid);
         state.type = gameOver ? 'game_over' : 'turn_skipped';
         state.skippedByName = players[playerId].name;
-            if (gameOver) {
+if (gameOver) {
 
-                state.gameOver = true;
+    state.gameOver = true;
 
-                state.resultMessage = winner === 'draw'
-                    ? '🤝 Игра је завршена након 4 прескочена потеза. Нерешено!'
-                    : '🏁 Игра је завршена након 4 прескочена потеза, побеђује играч са више поена.';
+    state.resultMessage = winner === 'draw'
+        ? '🤝 Игра је завршена након 4 прескочена потеза. Нерешено!'
+        : '🏁 Игра је завршена након 4 прескочена потеза, побеђује играч са више поена.';
 
-                state.finalScores = Object.entries(game.players)
-                    .map(([id, player]) => ({
-                        name: players[id]?.name || 'Играч',
-                        score: player.score
-                    }));
-            }
+    state.finalScores = Object.entries(game.players)
+        .map(([id, player]) => ({
+            name: players[id]?.name || 'Играч',
+            score: player.score
+        }));
+}
         sendToPlayer(pid, state.type, state);
     }
     console.log(`⏭ Igra ${game.id}: ${players[playerId].name} preskače (skip ${game.skipCount}/4)`);
