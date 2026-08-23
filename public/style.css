@@ -688,7 +688,7 @@ body.menu-active[data-menu-screen="nameScreen"] .overlay {
 
 /* Ekran 2 - slika 3 */
 body.menu-active[data-menu-screen="optionsScreen"] .overlay {
-  background-image: url("menu-options-bg3.jpg");
+  background-image: url("menu-options-bg3.png");
 }
 
 /* Ostali meniji koriste isti novi okvir, ali bez promene logike. */
@@ -696,7 +696,7 @@ body.menu-active[data-menu-screen="createRoomScreen"] .overlay,
 body.menu-active[data-menu-screen="joinRoomScreen"] .overlay,
 body.menu-active[data-menu-screen="findingScreen"] .overlay,
 body.menu-active[data-menu-screen="rulesScreen"] .overlay {
-  background-image: url("menu-options-bg3.jpg");
+  background-image: url("menu-options-bg3.png");
 }
 
 body.menu-active .overlay-content {
