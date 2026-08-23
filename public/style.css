@@ -1253,6 +1253,8 @@ button:disabled {
 
 /* Контејнер изреке */
 #findingScreen .proverb-container {
+    width: 88%;
+    max-width: 310px;
     margin: 0 auto 24px; 
 
     padding: 18px 16px;
