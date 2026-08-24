@@ -743,7 +743,7 @@ button:disabled {
 
   border: none;
 
-  box-shadow:;
+  box-shadow:none;
 }
 
 #optionsScreen h2 {
