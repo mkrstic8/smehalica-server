@@ -741,7 +741,7 @@ button:disabled {
 
   background: rgba(8, 61, 108, 0);
 
-  border: 2px solid rgba(255, 255, 255, 0.20);
+  border: none;
 
   box-shadow:
     0 12px 35px rgba(0, 0, 0, 0.45),
@@ -855,7 +855,7 @@ button:disabled {
 
 #nameOverlay .menu-panel {
   background: rgba(8, 61, 108, 0);
-  border: 2px solid rgba(255, 255, 255, 0.20);
+  border: none;
   border-radius: 24px;
   padding: 24px;
 
@@ -883,7 +883,7 @@ button:disabled {
   height: 58px;
   padding: 10px 16px;
 
-  border: 2px solid rgba(255, 255, 255, 0.7);
+  border: none;
   border-radius: 16px;
 
   background: rgba(255, 255, 255, 0.96);
@@ -1076,7 +1076,7 @@ button:disabled {
 
   background: rgba(8, 61, 108, 0);
 
-  border: 2px solid rgba(255, 255, 255, 0.20);
+  border: none;
 
   box-shadow:
     0 12px 35px rgba(0, 0, 0, 0.45),
@@ -1228,7 +1228,7 @@ button:disabled {
   border-radius: 16px;
 
   background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: none;
 }
 
 #findingScreen .proverb-text {
