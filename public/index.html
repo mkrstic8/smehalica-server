@@ -360,7 +360,7 @@
         }
 
         function showScreen(screenId) {
-            // Sakrij sve overlay ekrane
+            document.body.classList.toggle('game-active', screenId === 'game');
             document.querySelectorAll('.overlay-content').forEach(el => el.style.display = 'none');
             document.getElementById('nameOverlay').style.display = 'none';
             document.getElementById('gameContainer').style.display = 'none';

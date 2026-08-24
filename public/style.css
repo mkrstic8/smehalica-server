@@ -103,6 +103,25 @@ body {
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
+body.game-active {
+  background-image: none;
+}
+
+body.game-active::before {
+  content: "";
+  position: fixed;
+  inset: -40px;
+
+  background-image: url('menu-background.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+
+  filter: blur(35px);
+  transform: scale(1.05);
+
+  z-index: -1;
+}
 
 h1 {
   font-size: 1.5rem;
