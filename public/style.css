@@ -1533,3 +1533,11 @@ button:disabled {
         font-size: 0.95rem;
     }
 }
+/* Само мобилни */
+@media (max-width: 767px) {
+    body {
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+    }
+}
