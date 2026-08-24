@@ -1215,7 +1215,7 @@ button:disabled {
   border-radius: 16px;
 
   background: rgba(255, 255, 255, 0.12);
-  border: n;
+  border: none;
 }
 
 #findingScreen .proverb-text {
@@ -1264,9 +1264,7 @@ button:disabled {
 
   border: 2px solid rgba(255, 255, 255, 0.20);
 
-  box-shadow:
-    0 12px 35px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  box-shadow: none;
 }
 
 #findingScreen h2 {
@@ -1407,11 +1405,9 @@ button:disabled {
 
   background: rgba(8, 61, 108, 0);
 
-  border: 2px solid rgba(255, 255, 255, 0.20);
+  border: none;
 
-  box-shadow:
-    0 12px 35px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  box-shadow:none;
 
   text-align: center;
 }
