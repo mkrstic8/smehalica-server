@@ -44,25 +44,51 @@
         </button>
 
     </div>
-        <div class="overlay-content" id="optionsScreen" style="display:none;">
-<h2>🎮 Изабери начин игре</h2>
-            <button class="btn-success" id="btnQuickMatch" onclick="quickMatch()" style="width:100%;padding:12px;margin-bottom:8px;">
-                ⚡ БРЗА ИГРА
-            </button>
-            <button class="btn-primary" id="btnCreateRoom" onclick="showCreateRoom()" style="width:100%;padding:12px;margin-bottom:8px;">
-                🏠 НАПРАВИ СОБУ
-            </button>
-            <button class="btn-info" id="btnJoinRoomMenu" onclick="showJoinRoom()" style="width:100%;padding:12px;margin-bottom:8px;">
-                🔗 ПРИДРУЖИ СЕ СОБИ
-            </button>
-            <button class="btn-danger" onclick="showRules()" style="width:100%;padding:12px;margin-bottom:8px;">
-                📜 ПРАВИЛА
-            </button>
-            <button class="btn-secondary" onclick="goBackToName()" style="width:100%;padding:12px;">
-                ↩ НАЗАД
-            </button>
-        </div>
-        
+       <div class="overlay-content menu-panel" id="optionsScreen" style="display:none;">
+
+    <div class="menu-buttons">
+
+        <button
+            class="menu-button menu-green"
+            id="btnQuickMatch"
+            onclick="quickMatch()"
+        >
+            ⚡ БРЗА ИГРА
+        </button>
+
+        <button
+            class="menu-button menu-yellow"
+            id="btnCreateRoom"
+            onclick="showCreateRoom()"
+        >
+            🏠 НАПРАВИ СОБУ
+        </button>
+
+        <button
+            class="menu-button menu-blue"
+            id="btnJoinRoomMenu"
+            onclick="showJoinRoom()"
+        >
+            🔗 ПРИДРУЖИ СЕ СОБИ
+        </button>
+
+        <button
+            class="menu-button menu-purple"
+            onclick="showRules()"
+        >
+            📜 ПРАВИЛА
+        </button>
+
+        <button
+            class="menu-button menu-orange"
+            onclick="goBackToName()"
+        >
+            ↩ НАЗАД
+        </button>
+
+    </div>
+
+</div>
 <div class="overlay-content" id="rulesScreen">
     <img
         src="/pravilaigre.png"
@@ -551,7 +577,7 @@ socket.on('connected', (data) => {
         socket.on('rematch_declined', (msg) => {
             hideRematchRequest();
             addChatSystemMsg('❌ Реванш одбијен.');
-            setMessage('❌ Противник је одбио реванш.', 'info', 3000);
+            setMessage('❌ ' + msg.message, 'info', 3000);
             removeRematchButton(); // уклања се реванш, остаје menuBtn
         });
         socket.on('rematch_sent', (msg) => {

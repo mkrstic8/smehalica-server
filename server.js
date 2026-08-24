@@ -1670,7 +1670,7 @@ if (gameOver) {
 
     state.resultMessage = winner === 'draw'
         ? '🤝 Игра је завршена након 4 прескочена потеза. Нерешено!'
-        : '🏁 Игра је завршена након 4 прескочена потеза, побеђује играч са више поена.';
+        : 'Игра је завршена након 4 прескочена потеза, побеђује играч са више поена.';
 
     state.finalScores = Object.entries(game.players)
         .map(([id, player]) => ({
@@ -1989,7 +1989,7 @@ function handleDeclineRematch(socket, playerId, fromId) {
     game.rematchRequestedBy = null;
 
     sendToPlayer(fromId, 'rematch_declined', {
-        message: `${player.name} је одбио реванш.`
+        message: `Противник је одбио реванш.`
     });
 
     socket.emit('rematch_declined', {
