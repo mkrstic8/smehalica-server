@@ -727,10 +727,9 @@ button:disabled {
 
 #nameOverlay {
     background-image: url('menu-background.png');
-    background-size: contain;
+    background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
-    background-color: #173f5f;
 }
 
 /* Panel preko slike */
@@ -936,12 +935,9 @@ button:disabled {
 }
 
 @media (min-width: 768px) {
-    body {
-        max-width: none;
-        width: 100%;
-        margin: 0;
-        border-left: none;
-        border-right: none;
+    #nameOverlay {
+        background-size: contain;
+        background-color: #173f5f;
     }
 }
 /* =========================================================
