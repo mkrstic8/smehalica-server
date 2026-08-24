@@ -739,7 +739,7 @@ button:disabled {
   padding: 24px;
   border-radius: 24px;
 
-  background: rgba(8, 61, 108, 0.25);
+  background: rgba(8, 61, 108, 0);
 
   border: 2px solid rgba(255, 255, 255, 0.20);
 
@@ -854,7 +854,7 @@ button:disabled {
 }
 
 #nameOverlay .menu-panel {
-  background: rgba(8, 61, 108, 0.25);
+  background: rgba(8, 61, 108, 0);
   border: 2px solid rgba(255, 255, 255, 0.20);
   border-radius: 24px;
   padding: 24px;
@@ -1074,7 +1074,7 @@ button:disabled {
   padding: 24px;
   border-radius: 24px;
 
-  background: rgba(8, 61, 108, 0.25);
+  background: rgba(8, 61, 108, 0);
 
   border: 2px solid rgba(255, 255, 255, 0.20);
 
@@ -1273,7 +1273,7 @@ button:disabled {
 
   border-radius: 24px;
 
-  background: rgba(8, 61, 108, 0.25);
+  background: rgba(8, 61, 108, 0);
 
   border: 2px solid rgba(255, 255, 255, 0.20);
 
@@ -1419,7 +1419,7 @@ button:disabled {
 
   border-radius: 24px;
 
-  background: rgba(8, 61, 108, 0.25);
+  background: rgba(8, 61, 108, 0);
 
   border: 2px solid rgba(255, 255, 255, 0.20);
 
