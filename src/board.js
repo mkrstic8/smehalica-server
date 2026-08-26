@@ -3,27 +3,32 @@
 const { BOARD_SIZE } = require('./config');
 
 /**
- * Tabla bonusa 15x15.
+ * Tabla bonusa 13x13.
+ *
+ * Dobijena sečenjem originalne 15x15 table: izbačeni su redovi i kolone
+ * sa indeksom 1 i 13. Tako spoljni prsten (TW uglovi i ivice) ostaje ceo,
+ * a centar pada tačno na [6][6]. Prosto skraćivanje na prvih 13 pomerilo
+ * bi centar na DL polje i pokvarilo simetriju.
+ *
+ * Izgubljeno sečenjem: DW 16->12, TL 12->4. TW (8) i DL (24) netaknuti.
  * DL = duplo slovo, TL = triplo slovo,
  * DW = dupla reč,   TW = tripla reč,
  * ❖  = centar (računa se kao dupla reč).
  */
 const bonusBoard = Object.freeze([
-    ['TW', '', '', 'DL', '', '', '', 'TW', '', '', '', 'DL', '', '', 'TW'],
-    ['', 'DW', '', '', '', 'TL', '', '', '', 'TL', '', '', '', 'DW', ''],
-    ['', '', 'DW', '', '', '', 'DL', '', 'DL', '', '', '', 'DW', '', ''],
-    ['DL', '', '', 'DW', '', '', '', 'DL', '', '', '', 'DW', '', '', 'DL'],
-    ['', '', '', '', 'DW', '', '', '', '', '', 'DW', '', '', '', ''],
-    ['', 'TL', '', '', '', 'TL', '', '', '', 'TL', '', '', '', 'TL', ''],
-    ['', '', 'DL', '', '', '', 'DL', '', 'DL', '', '', '', 'DL', '', ''],
-    ['TW', '', '', 'DL', '', '', '', '❖', '', '', '', 'DL', '', '', 'TW'],
-    ['', '', 'DL', '', '', '', 'DL', '', 'DL', '', '', '', 'DL', '', ''],
-    ['', 'TL', '', '', '', 'TL', '', '', '', 'TL', '', '', '', 'TL', ''],
-    ['', '', '', '', 'DW', '', '', '', '', '', 'DW', '', '', '', ''],
-    ['DL', '', '', 'DW', '', '', '', 'DL', '', '', '', 'DW', '', '', 'DL'],
-    ['', '', 'DW', '', '', '', 'DL', '', 'DL', '', '', '', 'DW', '', ''],
-    ['', 'DW', '', '', '', 'TL', '', '', '', 'TL', '', '', '', 'DW', ''],
-    ['TW', '', '', 'DL', '', '', '', 'TW', '', '', '', 'DL', '', '', 'TW'],
+    ['TW', '', 'DL', '', '', '', 'TW', '', '', '', 'DL', '', 'TW'],
+    ['', 'DW', '', '', '', 'DL', '', 'DL', '', '', '', 'DW', ''],
+    ['DL', '', 'DW', '', '', '', 'DL', '', '', '', 'DW', '', 'DL'],
+    ['', '', '', 'DW', '', '', '', '', '', 'DW', '', '', ''],
+    ['', '', '', '', 'TL', '', '', '', 'TL', '', '', '', ''],
+    ['', 'DL', '', '', '', 'DL', '', 'DL', '', '', '', 'DL', ''],
+    ['TW', '', 'DL', '', '', '', '❖', '', '', '', 'DL', '', 'TW'],
+    ['', 'DL', '', '', '', 'DL', '', 'DL', '', '', '', 'DL', ''],
+    ['', '', '', '', 'TL', '', '', '', 'TL', '', '', '', ''],
+    ['', '', '', 'DW', '', '', '', '', '', 'DW', '', '', ''],
+    ['DL', '', 'DW', '', '', '', 'DL', '', '', '', 'DW', '', 'DL'],
+    ['', 'DW', '', '', '', 'DL', '', 'DL', '', '', '', 'DW', ''],
+    ['TW', '', 'DL', '', '', '', 'TW', '', '', '', 'DL', '', 'TW'],
 ].map(Object.freeze));
 
 /** Vrednost svakog slova u poenima. NE MENJATI. */

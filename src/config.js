@@ -26,8 +26,8 @@ module.exports = {
     CORS_ORIGIN: process.env.CORS_ORIGIN || '*',
 
     // ---------- Pravila igre ----------
-    BOARD_SIZE: 15,
-    CENTER: 7,
+    BOARD_SIZE: 13,
+    CENTER: 6,   // sredina table 13x13; rules.js proverava prvi potez ovim
     RACK_SIZE: 8,              // igra se sa 8 slova na stalku
     BINGO_BONUS: 50,           // bonus kad se u jednom potezu odigraju sva slova
     MAX_SKIPS: 4,              // posle 4 preskočena poteza igra se završava
