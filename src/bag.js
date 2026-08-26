@@ -27,18 +27,31 @@ const { randomBelow, randomDifferentItem, shuffleInPlace } = require('./random')
  *
  * Kako je sada:
  * jedno mešanje, pa ciljane zamene. Vreća se gleda kao niz "prozora" od
- * RACK_SIZE pločica, redom kojim će biti izvučene, i svaki prozor se dovede
+ * DRAW_SIZE pločica, redom kojim će biti izvučene, i svaki prozor se dovede
  * u igriv opseg (2-5 samoglasnika, najviše 2 retka slova). Zamene su uvek
  * unutar iste vreće, pa se sadržaj matematički ne može promeniti.
  *
  * Rezultat: jedan prolaz umesto 101, i stvarna garancija umesto proseka.
  */
 
+/**
+ * Koliko se pločica STVARNO vadi iz vreće za pun stalak.
+ *
+ * Stalak ima RACK_SIZE mesta, ali jedno od njih drži specijalno slovo,
+ * koje se ne izvlači iz vreće nego se generiše zasebno (createSpecialTile).
+ * Iz vreće dolazi RACK_SIZE - 1 pločica.
+ *
+ * Ovo mora da bude tačno: prozori dole moraju da se poklope sa stvarnim
+ * izvlačenjem. Ako je prozor 8 a izvlačenje 7, granice se pomeraju za jedno
+ * mesto pri svakom izvlačenju i balansiranje gađa pogrešne pločice.
+ */
+const DRAW_SIZE = RACK_SIZE - 1;
+
 /** Pločice se izvlače sa kraja niza (pop), pa je poslednji prozor prvi na redu. */
 function drawWindows(bag) {
     const windows = [];
-    for (let end = bag.length; end - RACK_SIZE >= 0; end -= RACK_SIZE) {
-        windows.push({ start: end - RACK_SIZE, end });
+    for (let end = bag.length; end - DRAW_SIZE >= 0; end -= DRAW_SIZE) {
+        windows.push({ start: end - DRAW_SIZE, end });
     }
     return windows;
 }
