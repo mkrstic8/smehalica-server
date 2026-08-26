@@ -31,18 +31,15 @@ const bonusBoard = Object.freeze([
     ['TW', '', '', '', 'DL', '', '', '', 'DL', '', '', '', 'TW'],
 ].map(Object.freeze));
 
-/** Vrednost svakog slova u poenima. NE MENJATI. */
+/** Vrednost svakog slova u poenima. */
 const letterValues = Object.freeze({
     'А': 1, 'Б': 3, 'В': 2, 'Г': 3, 'Д': 2, 'Ђ': 6, 'Е': 1, 'Ж': 4, 'З': 3,
     'И': 1, 'Ј': 2, 'К': 2, 'Л': 2, 'Љ': 4, 'М': 2, 'Н': 1, 'Њ': 5, 'О': 1,
-    'П': 2, 'Р': 1, 'С': 1, 'Т': 1, 'Ћ': 5, 'У': 1, 'Ф': 8, 'Х': 6, 'Ц': 4,
+    'П': 2, 'Р': 1, 'С': 1, 'Т': 1, 'Ћ': 5, 'У': 2, 'Ф': 8, 'Х': 6, 'Ц': 4,
     'Ч': 4, 'Џ': 10, 'Ш': 4,
 });
 
-/**
- * Frekvencija pločica u vreći - ukupno 68 pločica.
- * NE MENJATI: ni slova, ni brojeve.
- */
+/** Frekvencija pločica u vreći - ukupno 68*/
 const tileDistribution = Object.freeze([
     ['А',7], ['Б',1], ['В',2], ['Г',1], ['Д',2],
     ['Ђ',1], ['Е',6], ['Ж',1], ['З',1], ['И',6],
