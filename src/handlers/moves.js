@@ -6,7 +6,7 @@ const { validateMove, applyMove } = require('../rules');
 const {
     opponentOf,
     bumpVersion,
-    refreshSpecialTileForTurn,
+    updateSpecialTileAfterMove,
     getGameState,
     emitToPlayer,
     emitStateToAll,
@@ -40,23 +40,28 @@ function handlePlaceTiles(socket, playerId, placements) {
         return;
     }
 
-    applyMove(game, playerId, move);
+applyMove(game, playerId, move);
 
-    game.lastMove = {
-        playerId,
-        words: move.words,
-        score: move.score,
-        bingo: move.bingo,
-        placements: move.placements,
-    };
+// Специјално слово се обрађује ОДМАХ после успешног потеза
+// и допуњавања регуларних слова истог играча.
+updateSpecialTileAfterMove(
+    game,
+    playerId,
+    move.placements.some(tile => tile.special === true)
+);
 
-    const opponentId = opponentOf(game, playerId);
-    game.currentTurn = opponentId;
+game.lastMove = {
+    playerId,
+    words: move.words,
+    score: move.score,
+    bingo: move.bingo,
+    placements: move.placements,
+};
 
-    // Нови потез је прихваћен: сада, и само сада, припреми
-    // специјално слово играча који је на реду.
-    refreshSpecialTileForTurn(game, opponentId);
-    bumpVersion(game);
+const opponentId = opponentOf(game, playerId);
+game.currentTurn = opponentId;
+
+bumpVersion(game);
 
     // Odigran potez ide i u istoriju četa, da se vidi i posle reconnect-a.
     const moveMessage = pushChatMessage(game, {
@@ -98,7 +103,6 @@ function handleSkipTurn(socket, playerId) {
     if (!allowAction(player, 'move', MOVE_MIN_INTERVAL_MS)) return;
 
     game.currentTurn = opponentOf(game, playerId);
-    refreshSpecialTileForTurn(game, game.currentTurn);
     game.lastMove = { playerId, words: [], score: 0, skipped: true };
     game.skipCount = (game.skipCount || 0) + 1;
     bumpVersion(game);

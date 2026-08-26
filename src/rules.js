@@ -314,14 +314,15 @@ function applyMove(game, playerId, move) {
     const normalTilesUsed = move.placements.filter(tile => !tile.special).length;
     const usedSpecial = move.placements.some(tile => tile.special === true);
 
-    // Специјално слово није део вреће. Ако је употребљено, привремено
-    // нестаје из руке. На почетку његовог следећег потеза, ако у врећи
-    // још има слова, refreshSpecialTileForTurn() ће додати ново љубичасто
-    // слово. Ако је врећа празна, неће га вратити и тада је трајно потрошено.
-    if (usedSpecial) {
-        const used = move.placements.find(tile => tile.special === true);
-        player.lastSpecialLetter = used.letter;
-    }
+// Специјално слово није део вреће.
+// Ако је употребљено, привремено нестаје из руке.
+// Коначну одлуку о новом специјалном слову доноси
+// updateSpecialTileAfterMove() одмах после допуњавања
+// регуларних слова из вреће.
+if (usedSpecial) {
+    const used = move.placements.find(tile => tile.special === true);
+    player.lastSpecialLetter = used.letter;
+}
 
     player.rack = move.remainingRack.concat(
         drawTiles(game.bag, normalTilesUsed)

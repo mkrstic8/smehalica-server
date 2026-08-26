@@ -77,34 +77,7 @@ function bumpVersion(game) {
     game.stateVersion = (game.stateVersion || 0) + 1;
 }
 
-/**
- * Specijalno slovo menja se samo kada novi potez zaista počne.
- * Ne dira se tokom validacije, pa neuspešan potez ne može da ga promeni.
- * Kada se vreća isprazni, postojeće specijalno slovo ostaje zaključano.
- */
-function refreshSpecialTileForTurn(game, playerId) {
-    // Када нема више слова у врећици, специјално слово се више НЕ
-    // ствара/мења. Ако је већ у руци, остаје са последњим словом до краја.
-    if (game.bag.length === 0) return;
 
-    const player = game.players.get(playerId);
-    if (!player) return;
-
-    const special = player.rack.find(tile => tile && typeof tile === 'object' && tile.special === true);
-
-    // Ако је играч у претходном потезу ПОТРОШИО специјално слово, оно
-    // тренутно није у руци. На почетку његовог новог потеза поново се
-    // појављује као ново љубичасто слово, све док у врећи има слова.
-    if (!special) {
-        player.rack.push(createSpecialTile(player.lastSpecialLetter || null));
-        return;
-    }
-
-    // Ако га није потрошио, само промени слово за нови потез.
-    const previous = special.letter;
-    special.letter = randomDifferentItem(ALPHABET.split(''), previous);
-    player.lastSpecialLetter = special.letter;
-}
 
 // ==================== STANJE ZA KLIJENTA ====================
 
@@ -248,6 +221,58 @@ function shouldEndAfterMove(game, playerId) {
     const seat = game.players.get(playerId);
     return Boolean(seat) && seat.rack.length === 0;
 }
+/**
+ * Обрада специјалног слова ОДМАХ након успешно прихваћеног потеза.
+ *
+ * Правила:
+ * 1. Ако специјално није одиграно -> промени му слово одмах.
+ * 2. Ако је специјално одиграно и играч после допуне има
+ *    7 регуларних слова -> додај ново специјално слово.
+ * 3. Ако је специјално одиграно, али нема 7 регуларних слова
+ *    -> специјално се трајно уклања јер се ближи крај игре.
+ */
+function updateSpecialTileAfterMove(game, playerId, usedSpecial) {
+    const player = game.players.get(playerId);
+    if (!player) return;
+
+    const specialIndex = player.rack.findIndex(
+        tile => tile && typeof tile === 'object' && tile.special === true
+    );
+
+    // Играч НИЈЕ одиграо специјално слово.
+    // Његово постојеће специјално слово одмах добија ново слово.
+    if (!usedSpecial) {
+        if (specialIndex === -1) return;
+
+        const special = player.rack[specialIndex];
+        const previous = special.letter;
+
+        special.letter = randomDifferentItem(
+            ALPHABET.split(''),
+            previous
+        );
+
+        player.lastSpecialLetter = special.letter;
+        return;
+    }
+
+    // Играч ЈЕ одиграо специјално слово.
+    // Проверимо колико има регуларних слова после допуне.
+    const regularCount = player.rack.filter(
+        tile => !(tile && typeof tile === 'object' && tile.special === true)
+    ).length;
+
+    // Има 7 регуларних → одмах добија ново специјално слово.
+    if (regularCount === RACK_SIZE - 1) {
+        player.rack.push(
+            createSpecialTile(player.lastSpecialLetter || null)
+        );
+        return;
+    }
+
+    // Нема 7 регуларних → специјално се НЕ враћа.
+    // Тиме остаје трајно уклоњено јер се ближи крај игре.
+}
 
 // ==================== ČET ====================
 
@@ -263,7 +288,7 @@ module.exports = {
     createGame,
     opponentOf,
     bumpVersion,
-    refreshSpecialTileForTurn,
+    updateSpecialTileAfterMove,
     getGameState,
     finalScores,
     defaultResultMessage,
