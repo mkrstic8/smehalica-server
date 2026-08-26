@@ -40,28 +40,28 @@ function handlePlaceTiles(socket, playerId, placements) {
         return;
     }
 
-applyMove(game, playerId, move);
+    applyMove(game, playerId, move);
 
-// Специјално слово се обрађује ОДМАХ после успешног потеза
-// и допуњавања регуларних слова истог играча.
-updateSpecialTileAfterMove(
-    game,
-    playerId,
-    move.placements.some(tile => tile.special === true)
-);
+    // Специјално слово се обрађује ОДМАХ после успешног потеза
+    // и допуњавања регуларних слова истог играча.
+    updateSpecialTileAfterMove(
+        game,
+        playerId,
+        move.placements.some(tile => tile.special === true)
+    );
 
-game.lastMove = {
-    playerId,
-    words: move.words,
-    score: move.score,
-    bingo: move.bingo,
-    placements: move.placements,
-};
+    game.lastMove = {
+        playerId,
+        words: move.words,
+        score: move.score,
+        bingo: move.bingo,
+        placements: move.placements,
+    };
 
-const opponentId = opponentOf(game, playerId);
-game.currentTurn = opponentId;
+    const opponentId = opponentOf(game, playerId);
+    game.currentTurn = opponentId;
 
-bumpVersion(game);
+    bumpVersion(game);
 
     // Odigran potez ide i u istoriju četa, da se vidi i posle reconnect-a.
     const moveMessage = pushChatMessage(game, {
