@@ -278,27 +278,22 @@ socket.on('connected', (data) => {
          });
 
         socket.on('move_result', (msg) => {
-            moveInFlight = false;
-            updateGameState(msg);
-            if (msg.lastMoveWords && msg.lastMoveWords.length > 0) {
-                const isMyMove = msg.lastMovePlayerName === myName;
-                if (isMyMove) {
-                    sfxValid();
-                    if (msg.lastMove && msg.lastMove.placements) {
-                        msg.lastMove.placements.forEach(p => {
-                            animateCell(p.row, p.col, 'bounce');
-                            const cellEl = document.querySelector(`.cell[data-row="${p.row}"][data-col="${p.col}"]`);
-                            if (cellEl) {
-                                const rect = cellEl.getBoundingClientRect();
-                                spawnParticles(rect.left + rect.width/2, rect.top + rect.height/2, '#FFD700', 8);
-                            }
-                        });
-                    }
-                } else {
-                    sfxOpponent();
-                }
+    moveInFlight = false;
+    updateGameState(msg);
+    if (msg.lastMoveWords && msg.lastMoveWords.length > 0) {
+        const isMyMove = msg.lastMovePlayerName === myName;
+        if (isMyMove) {
+            sfxValid();
+            if (msg.lastMove && msg.lastMove.placements) {
+                msg.lastMove.placements.forEach(p => {
+                    animateCell(p.row, p.col, 'bounce');
+                });
             }
-        });
+        } else {
+            sfxOpponent();
+        }
+    }
+});
 
         socket.on('move_invalid', (msg) => {
             moveInFlight = false;

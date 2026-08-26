@@ -14,5 +14,5 @@
    ========================================================= */
 
 window.SMEHALICA_CONFIG = {
-    SERVER_URL: 'https://smelica-server.onrender.com'
+    SERVER_URL: 'https://smehalica-server.onrender.com'
 };
