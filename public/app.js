@@ -369,7 +369,7 @@ socket.on('connected', (data) => {
                 menuBtn2 = document.createElement('button');
                 menuBtn2.id = 'menuBtn';
                 menuBtn2.className = 'btn-light';
-                menuBtn2.textContent = '🏠 POČETNI MENI';
+                menuBtn2.textContent = '🏠 ПОЧЕТНИ МЕНИ';
                 menuBtn2.onclick = () => goToMainMenu();
                 controls.appendChild(menuBtn2);
             }
