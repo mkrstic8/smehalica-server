@@ -373,6 +373,18 @@ h1 {
   color: #000;
 }
 
+.tile.special-tile {
+  background: #B266FF;
+  border-color: #7B1FA2;
+  color: #000;
+  box-shadow: 0 3px 5px rgba(123,31,162,0.45);
+}
+
+.tile.special-tile.selected {
+  border-color: #6A1B9A;
+  box-shadow: 0 0 15px rgba(178,102,255,0.9);
+}
+
 .tile:active {
   transform: scale(0.85);
 }
