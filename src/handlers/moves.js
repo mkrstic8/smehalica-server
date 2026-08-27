@@ -67,7 +67,7 @@ function handlePlaceTiles(socket, playerId, placements) {
     const moveMessage = pushChatMessage(game, {
         type: 'move',
         from: player.name,
-        text: `🎯 игра: ${move.words.join(', ')} (+${move.score})${move.bingo ? ' 🎉 БИНГО!' : ''}`,
+        text: `🎯 игра: ${move.words.join(', ')} (+${move.score})${move.bingo ? ' 🎉 Колетов бонус!' : ''}`,
         timestamp: Date.now(),
     });
 
