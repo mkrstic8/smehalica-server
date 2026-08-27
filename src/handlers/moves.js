@@ -116,6 +116,7 @@ function handleSkipTurn(socket, playerId) {
                     : `Игра је завршена након ${MAX_SKIPS} прескочена потеза — побеђује играч са више поена.`,
         });
     } else {
+        updateSpecialTileAfterMove(game, playerId, false);
         emitStateToAll(game, 'turn_skipped', (state) => {
             state.skippedByName = player.name;
         });
